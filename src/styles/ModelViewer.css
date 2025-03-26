@@ -1,0 +1,124 @@
+/* ModelViewer.css */
+.model-viewer {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  transition: background-color 1.5s ease;
+}
+
+/* 배경 스타일 - 기본값은 기존과 동일 */
+.model-viewer.background-default {
+  background: linear-gradient(to bottom, #87CEEB, #E0F7FA);
+}
+
+/* 석양 배경 */
+.model-viewer.background-sunset {
+  background: linear-gradient(to bottom, #FF7E57, #FFC2A9);
+}
+
+/* 밤 배경 */
+.model-viewer.background-night {
+  background: linear-gradient(to bottom, #1A1A2E, #16213E);
+}
+
+/* 아침 배경 */
+.model-viewer.background-dawn {
+  background: linear-gradient(to bottom, #FFCDB6, #FEE2D7);
+}
+
+/* 모델 뷰어 오버레이 효과 - 가장자리 비네팅 효과 */
+.model-viewer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at center, transparent 60%, rgba(0, 0, 0, 0.3) 100%);
+  pointer-events: none;
+  z-index: 1;
+  transition: background 1s ease;
+}
+
+/* 배경별 비네팅 효과 조정 */
+.model-viewer.background-sunset::after {
+  background: radial-gradient(circle at center, transparent 60%, rgba(70, 20, 0, 0.4) 100%);
+}
+
+.model-viewer.background-night::after {
+  background: radial-gradient(circle at center, transparent 60%, rgba(0, 0, 30, 0.6) 100%);
+}
+
+.model-viewer.background-dawn::after {
+  background: radial-gradient(circle at center, transparent 60%, rgba(100, 50, 30, 0.3) 100%);
+}
+
+/* 모델 뷰어 내부 그림자 효과 - 분위기 조성 */
+.model-viewer::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 100px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.1), transparent);
+  pointer-events: none;
+  z-index: 1;
+  transition: background 1s ease;
+}
+
+/* 배경별 그림자 효과 조정 */
+.model-viewer.background-sunset::before {
+  background: linear-gradient(to top, rgba(80, 30, 0, 0.15), transparent);
+}
+
+.model-viewer.background-night::before {
+  background: linear-gradient(to top, rgba(0, 0, 20, 0.25), transparent);
+}
+
+.model-viewer.background-dawn::before {
+  background: linear-gradient(to top, rgba(100, 50, 30, 0.1), transparent);
+}
+
+/* 앱 배경 스타일 (App.css에 추가) */
+.app {
+  transition: background-color 1.5s ease;
+}
+
+.app.background-default {
+  background: linear-gradient(135deg, #1c1c1c 0%, #2a2a2a 100%);
+}
+
+.app.background-sunset {
+  background: linear-gradient(135deg, #2D142C 0%, #510A32 100%);
+}
+
+.app.background-night {
+  background: linear-gradient(135deg, #0F0F1B 0%, #1B1B3A 100%);
+}
+
+.app.background-dawn {
+  background: linear-gradient(135deg, #432C27 0%, #6B4F44 100%);
+}
+
+/* 로딩 표시기 스타일 (필요한 경우) */
+.model-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 18px;
+  background-color: rgba(0, 0, 0, 0.5);
+  padding: 10px 20px;
+  border-radius: 10px;
+  z-index: 10;
+}
+
+/* 모바일 최적화 */
+@media (max-width: 768px) {
+  .model-viewer {
+    height: 80vh; /* 모바일에서 화면 높이 조정 */
+  }
+}

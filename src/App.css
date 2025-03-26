@@ -1,38 +1,162 @@
-.App {
-  text-align: center;
+/* App.css */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+body, html {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  height: 100%;
+  overflow: hidden;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
+.app {
+  width: 100%;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #1c1c1c 0%, #2a2a2a 100%); /* 더 어두운 배경 */
+}
+
+.model-container {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: transparent; /* 배경을 투명하게 변경 */
+  overflow: hidden; /* 내용이 넘치지 않도록 설정 */
+}
+
+/* 모바일에서 모델 컨테이너가 화면을 꽉 채우도록 설정 */
+@media (max-width: 768px) {
+  .model-container {
+    width: 100vw; /* 화면 너비 전체 사용 */
+    height: 100vh; /* 화면 높이 전체 사용 */
+    object-fit: cover; /* 내용이 컨테이너를 채우도록 설정 */
+    position: fixed; /* 고정 위치 */
+  }
+
+  /* 모델 뷰어가 화면을 꽉 채우도록 설정 */
+  .model-viewer {
+    width: 100vw !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+  }
+
+  /* 3D 모델 배경이 있는 경우 화면을 채우도록 설정 */
+  canvas {
+    width: 100vw !important;
+    height: 100vh !important;
+    object-fit: cover !important;
   }
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+.chat-ui-container {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 600px;
+  z-index: 100;
   display: flex;
   flex-direction: column;
   align-items: center;
+  background: none; /* 배경 제거 */
+  pointer-events: none; /* 컨테이너 자체는 클릭 이벤트를 통과시킴 */
+}
+
+.chat-ui-container > * {
+  pointer-events: auto; /* 자식 요소는 클릭 이벤트를 받음 */
+  width: 100%;
+}
+
+/* 로딩 화면 */
+.loading-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
+  align-items: center;
+  z-index: 1000;
   color: white;
 }
 
-.App-link {
-  color: #61dafb;
+.loading-message {
+  margin-top: 20px;
+  font-size: 18px;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+}
+
+/* 모바일 최적화 - 검은색 사각형 제거 */
+@media (max-width: 768px) {
+  .chat-ui-container {
+    bottom: 10px;
+    width: 95%;
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
   }
-  to {
-    transform: rotate(360deg);
+
+  /* 채팅 컨테이너 스타일 추가 */
+  .chat-container {
+    margin: 0 auto;
+    width: 100%;
+    backdrop-filter: blur(12px);
   }
+}
+
+.welcome-button-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 200;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.welcome-button {
+  background-color: #0084ff;
+  color: white;
+  border: none;
+  border-radius: 30px;
+  padding: 15px 30px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.welcome-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+  background-color: #0073e6;
+}
+
+.welcome-button:active {
+  transform: translateY(1px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }

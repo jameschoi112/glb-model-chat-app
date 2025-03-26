@@ -1,0 +1,252 @@
+.admin-controls {
+  position: absolute;
+  right: 20px;
+  top: 160px; /* 시간 영역 아래로 충분히 내림 */
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end; /* 우측 정렬 */
+  gap: 10px;
+}
+
+/* 관리자 모드 버튼 */
+.admin-button {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background-color: rgba(30, 30, 42, 0.85);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.admin-button:hover {
+  background-color: rgba(30, 30, 42, 0.95);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.admin-button.active {
+  background-color: rgba(0, 132, 255, 0.8);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.admin-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease;
+}
+
+/* 메인 동작 버튼 (통합 버튼) */
+.action-main-button {
+  width: auto;
+  height: 40px;
+  border-radius: 10px;
+  background-color: rgba(30, 30, 42, 0.85);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+  gap: 8px;
+}
+
+.action-main-button:hover {
+  background-color: rgba(30, 30, 42, 0.95);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.action-main-button.active {
+  background-color: rgba(0, 132, 255, 0.8);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.action-label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.action-arrow {
+  margin-left: 2px;
+  opacity: 0.7;
+  transition: transform 0.2s;
+}
+
+/* 동작 버튼 드롭다운 메뉴 */
+.actions-dropdown {
+  width: 160px;
+  background-color: rgba(30, 30, 42, 0.95);
+  border-radius: 10px;
+  overflow: hidden;
+  height: 0;
+  opacity: 0;
+  transition: height 0.3s, opacity 0.3s;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.action-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  text-align: left;
+  font-size: 14px;
+}
+
+.action-dropdown-item:not(:last-child) {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.action-dropdown-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.action-dropdown-item span {
+  flex: 1;
+}
+
+/* 관리자 패널 */
+.admin-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 320px;
+  height: 100vh;
+  background-color: rgba(25, 25, 35, 0.95);
+  backdrop-filter: blur(15px);
+  z-index: 999;
+  color: white;
+  padding: 20px;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+  transform: translateX(-100%);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-panel h3 {
+  font-size: 22px;
+  margin: 0;
+  padding-bottom: 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: center;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.panel-section {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.panel-section h4 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  margin: 10px 0 15px 0;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.option-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.option-button {
+  padding: 12px;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.08);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  font-size: 14px;
+}
+
+.option-button:hover {
+  background-color: rgba(0, 132, 255, 0.25);
+  transform: translateY(-2px);
+  border-color: rgba(0, 132, 255, 0.4);
+}
+
+.setting-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 15px 0;
+}
+
+.setting-row label {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.setting-row input[type="range"] {
+  width: 100%;
+  height: 5px;
+  -webkit-appearance: none;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 5px;
+  outline: none;
+}
+
+.setting-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #0084ff;
+  cursor: pointer;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+}
+
+/* 모바일 최적화 */
+@media (max-width: 768px) {
+  .admin-controls {
+    right: 15px;
+    top: 140px; /* 모바일에서 시간 영역과 겹치지 않도록 더 조정 */
+  }
+
+  .admin-button {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+  }
+
+  .action-main-button {
+    height: 36px;
+    padding: 0 10px;
+  }
+
+  .admin-panel {
+    width: 280px;
+  }
+}
