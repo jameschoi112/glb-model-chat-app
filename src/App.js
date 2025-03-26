@@ -6,7 +6,7 @@ import DateTimeDisplay from './components/DateTimeDisplay';
 import AdminPanel from './components/AdminPanel';
 import WelcomePopup from './components/WelcomePopup';
 import useLipSync from './components/LipSync';
-import { initializeSession, sendMessageStream } from './services/customChatService';
+import { initializeSession, sendMessageStream, resetSession } from './services/customChatService';
 import { speakText } from './services/openaiVoiceService'; // TTS는 기존 서비스 재사용
 import { startSpeechRecognition, stopSpeechRecognition } from './services/speechRecognitionService';
 import './App.css';
@@ -24,6 +24,7 @@ function App() {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [suggestedQuestions, setSuggestedQuestions] = useState([]);
+  const [sessionInitialized, setSessionInitialized] = useState(false);
 
   // 현재 활성화된 스트리밍 연결 참조
   const activeStreamRef = useRef(null);
@@ -35,7 +36,7 @@ function App() {
   const { lipSyncData } = useLipSync(currentMessage, isSpeaking);
 
   const audioRef = useRef(null);
-  const welcomeMessageRef = useRef('Hello! I`m your avatar!');
+  const welcomeMessageRef = useRef('안녕하세요! 저는 메타디움 아바타 비서입니다. 무엇을 도와드릴까요?');
 
   // 페이지 로드 시 초기화 작업
   useEffect(() => {
@@ -51,8 +52,10 @@ function App() {
     // 세션 초기화 및 모델 로드 시뮬레이션
     const setupApp = async () => {
       try {
-        // 챗봇 세션 초기화
-        await initializeSession();
+        // 챗봇 세션 초기화 시도
+        const sessionId = await initializeSession();
+        console.log('App 초기화 - 세션 ID 획득:', sessionId);
+        setSessionInitialized(true);
 
         // 모델 로딩 시뮬레이션
         setTimeout(() => {
@@ -92,6 +95,25 @@ function App() {
       stopSpeechRecognition(recognitionRef.current);
     };
   }, []);
+
+  // 세션 재설정 함수
+  const handleResetSession = async () => {
+    try {
+      if (activeStreamRef.current) {
+        activeStreamRef.current.close();
+        activeStreamRef.current = null;
+      }
+
+      const sessionId = await resetSession();
+      console.log('세션 재설정 완료:', sessionId);
+      setSessionInitialized(true);
+      return true;
+    } catch (error) {
+      console.error('세션 재설정 실패:', error);
+      setSessionInitialized(false);
+      return false;
+    }
+  };
 
   // 음성 인식 시작 함수
   const startVoiceRecognition = () => {
@@ -298,6 +320,15 @@ function App() {
   // 커스텀 API를 사용하여 메시지 전송 및 응답 처리
   const handleSendMessage = async (message) => {
     try {
+      // 세션이 초기화되지 않았다면 다시 시도
+      if (!sessionInitialized) {
+        console.log('세션이 초기화되지 않음, 세션 재설정 시도');
+        const resetSuccess = await handleResetSession();
+        if (!resetSuccess) {
+          throw new Error('세션을 초기화할 수 없습니다. 페이지를 새로고침 해주세요.');
+        }
+      }
+
       // 음성 인식 중이라면 중지
       if (isListening) {
         stopSpeechRecognition(recognitionRef.current);
@@ -328,29 +359,29 @@ function App() {
 
       // 응답 누적을 위한 변수
       let accumulatedResponse = '';
-      let botResponseObj = null;
+      let botResponseAdded = false;
+
+      console.log('메시지 전송 시작:', message);
 
       // 스트리밍 응답 처리 시작
       const eventSource = await sendMessageStream(
         message,
         // 콘텐츠 청크 처리 콜백
         (chunk, accumulated) => {
+          console.log('청크 수신:', chunk);
           accumulatedResponse = accumulated;
-          // 첫 응답 청크에서 봇 응답 객체 생성
-          if (!botResponseObj) {
-            botResponseObj = {
-              id: `bot-response-${updatedHistory.length}`,
-              text: accumulated,
-              sender: 'bot'
-            };
-            // 메시지 기록 업데이트 (첫 응답 시)
+
+          // 첫 청크 수신 시 봇 응답 객체 추가
+          if (!botResponseAdded) {
+            // 봇 응답 기록 추가
             const assistantMessage = { role: 'assistant', content: accumulated };
-            setMessageHistory([...updatedHistory, assistantMessage]);
+            setMessageHistory(prev => [...prev, assistantMessage]);
+            botResponseAdded = true;
           } else {
             // 이후 청크에서는 메시지 기록의 마지막 항목 업데이트
             const assistantMessage = { role: 'assistant', content: accumulated };
-            setMessageHistory(prevHistory => {
-              const newHistory = [...prevHistory];
+            setMessageHistory(prev => {
+              const newHistory = [...prev];
               newHistory[newHistory.length - 1] = assistantMessage;
               return newHistory;
             });
@@ -361,6 +392,7 @@ function App() {
         },
         // 추천 질문 처리 콜백
         (questions) => {
+          console.log('추천 질문 수신:', questions);
           setSuggestedQuestions(questions);
         },
         // 완료 처리 콜백
@@ -396,7 +428,7 @@ function App() {
       // 활성 스트리밍 참조 저장
       activeStreamRef.current = eventSource;
 
-      // 초기 빈 응답 객체 반환 (UI 업데이트를 위해)
+      // 챗인터페이스에서 사용할 응답 객체 반환
       return {
         id: `bot-response-${updatedHistory.length}`,
         text: '응답을 생성하는 중...',
@@ -421,6 +453,14 @@ function App() {
         sender: 'bot'
       };
     }
+  };
+
+  // 추천 질문 선택 처리
+  const handleSuggestedQuestionClick = (question) => {
+    // 추천 질문을 메시지로 전송
+    handleSendMessage(question);
+    // 질문 목록 초기화
+    setSuggestedQuestions([]);
   };
 
   // 배경 변경 핸들러
@@ -482,14 +522,14 @@ function App() {
               }))}
             />
 
-            {/* 추천 질문 UI (필요시 구현) */}
+            {/* 추천 질문 UI */}
             {suggestedQuestions.length > 0 && (
               <div className="suggested-questions">
                 {suggestedQuestions.map((question, index) => (
                   <button
                     key={index}
                     className="suggested-question-btn"
-                    onClick={() => handleSendMessage(question)}
+                    onClick={() => handleSuggestedQuestionClick(question)}
                   >
                     {question}
                   </button>
@@ -499,11 +539,11 @@ function App() {
           </div>
 
           {/* 음성 인식 중일 때 인식 텍스트 표시 (디버깅용, 필요 시 활성화) */}
-          {/* {isListening && transcript && (
+          {isListening && transcript && (
             <div className="transcript-container">
               <p>{transcript}</p>
             </div>
-          )} */}
+          )}
         </>
       )}
     </div>
