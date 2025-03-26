@@ -277,7 +277,7 @@ const Model = ({ lipSyncData, modelPath, position, ...props }) => {
 
   useEffect(() => {
     if (group.current) {
-      console.log("모델 뼈대 구조 출력:", modelPath);
+      //console.log("모델 뼈대 구조 출력:", modelPath);
 
       // 모든 본 이름 출력
       const bones = [];
@@ -287,12 +287,12 @@ const Model = ({ lipSyncData, modelPath, position, ...props }) => {
             name: object.name,
             parent: object.parent ? object.parent.name : "none"
           });
-          console.log(`본 발견: ${object.name}`);
+          //console.log(`본 발견: ${object.name}`);
         }
       });
 
       if (bones.length > 0) {
-        console.table(bones); // 표 형태로 정리해서 출력
+        //console.table(bones); // 표 형태로 정리해서 출력
       }
     }
   }, [modelPath]);
@@ -309,7 +309,6 @@ const Model = ({ lipSyncData, modelPath, position, ...props }) => {
   // 위치 직접 설정
   useEffect(() => {
     if (group.current && position) {
-      console.log("모델 위치 설정:", position);
       // 직접 position 설정
       group.current.position.set(position[0], position[1], position[2]);
     }
@@ -324,16 +323,16 @@ const Model = ({ lipSyncData, modelPath, position, ...props }) => {
       group.current.traverse((object) => {
         if (object.morphTargetDictionary) {
           morphTargetMesh.current = object;
-          console.log('모프 타겟을 가진 메시 찾음:', object.name);
-          console.log('사용 가능한 모프 타겟:', object.morphTargetDictionary);
+          //console.log('모프 타겟을 가진 메시 찾음:', object.name);
+          //console.log('사용 가능한 모프 타겟:', object.morphTargetDictionary);
 
           // 디버깅: 모든 모프 타겟 목록 출력
           if (object.morphTargetDictionary) {
             console.log('모든 모프 타겟 목록:');
             for (const [key, value] of Object.entries(object.morphTargetDictionary)) {
-              console.log(`  ${key}: 인덱스 ${value}`);
+              //console.log(`  ${key}: 인덱스 ${value}`);
             }
-            console.log('모프 타겟 영향값 배열 길이:', object.morphTargetInfluences ? object.morphTargetInfluences.length : '없음');
+            //console.log('모프 타겟 영향값 배열 길이:', object.morphTargetInfluences ? object.morphTargetInfluences.length : '없음');
           }
         }
 
@@ -611,7 +610,7 @@ const ModelViewer = ({ lipSyncData, background = 'default', modelPath = '/models
   // 모델 경로가 변경되면 업데이트
   useEffect(() => {
     setCurrentModelPath(modelPath);
-    console.log("모델 경로 업데이트:", modelPath);
+    //console.log("모델 경로 업데이트:", modelPath);
 
     // 모델 프리로드
     useGLTF.preload(modelPath);

@@ -25,9 +25,9 @@ export const initializeSession = async () => {
 
     console.log('세션 초기화 응답:', response);
 
-    // 응답에서 세션 ID 저장
-    if (response.data && response.data.session_id) {
-      currentSessionId = response.data.session_id;
+    // 응답에서 세션 ID 저장 - id 필드 사용
+    if (response.data && response.data.id) {
+      currentSessionId = response.data.id;
       console.log('세션 초기화 성공:', currentSessionId);
       return currentSessionId;
     } else {
@@ -40,10 +40,10 @@ export const initializeSession = async () => {
   }
 };
 
-// 대체 메서드 - URL 파라미터로 토큰 전달하는 함수
-export const sendMessageWithToken = async (message, onContentChunk, onSuggestedQuestions, onDone, onError) => {
+// 스트리밍 대신 HTTP 폴링 메서드 사용 (SSE 연결 문제 해결)
+export const sendMessageWithPolling = async (message, onContentChunk, onSuggestedQuestions, onDone, onError) => {
   try {
-    // 세션이 없으면 초기화 - 이 부분 개선
+    // 세션이 없으면 초기화
     if (!currentSessionId) {
       try {
         await initializeSession();
@@ -61,91 +61,109 @@ export const sendMessageWithToken = async (message, onContentChunk, onSuggestedQ
       }
     }
 
-    // 인코딩된 메시지로 URL 생성 - 토큰을 쿼리 파라미터로 추가
-    const encodedMessage = encodeURIComponent(message);
-    const streamUrl = `${BASE_URL}/api/chat/sessions/${currentSessionId}/stream/?message=${encodedMessage}&token=${API_TOKEN}`;
+    console.log('메시지 폴링 방식으로 전송 시작:', message);
 
-    console.log('스트리밍 요청 URL 생성:', streamUrl); // 디버깅용 로그
+    // 토큰과 함께 메시지 전송 (비동기 메서드 사용)
+    const response = await axios.post(
+      `${BASE_URL}/api/token-chat/message/${currentSessionId}/`,
+      { message },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Token ${API_TOKEN}`,
+        },
+      }
+    );
 
-    // SSE 연결 생성 (토큰을 URL에 포함)
-    const eventSource = new EventSource(streamUrl);
+    // process_id 받기
+    const processId = response.data.process_id;
+    console.log('메시지 전송 성공, process ID:', processId);
 
-    // 응답 전체 텍스트를 저장할 변수
+    // 폴링 시작
+    let attempts = 0;
+    const maxAttempts = 30;
+    const delay = 800; // 800ms 간격으로 폴링
     let fullResponse = '';
+    let isDone = false;
 
-    // 다양한 이벤트 처리
-    eventSource.onmessage = (event) => {
-      try {
-        console.log('SSE 이벤트 수신:', event.data);
-        const data = JSON.parse(event.data);
+    // 폴링 함수
+    const pollResult = async () => {
+      while (attempts < maxAttempts && !isDone) {
+        try {
+          const pollResponse = await axios.get(
+            `${BASE_URL}/api/chat/process/${processId}/`,
+            {
+              headers: {
+                'Authorization': `Token ${API_TOKEN}`,
+              },
+            }
+          );
 
-        switch (data.type) {
-          case 'message_id':
-            // 새 메시지 ID 수신 (필요시 저장)
-            console.log('새 메시지 ID:', data.message_id);
-            break;
+          const { status, response: result, suggested_questions } = pollResponse.data;
 
-          case 'content':
-            // 콘텐츠 청크 수신
-            fullResponse += data.content;
+          if (status === 'completed') {
+            console.log('응답 생성 완료:', result);
+
+            // 완성된 응답을 전달
+            fullResponse = result;
+
             if (onContentChunk) {
-              onContentChunk(data.content, fullResponse);
+              onContentChunk(result, result);
             }
-            break;
 
-          case 'suggested_questions':
-            // 추천 질문 수신
-            console.log('추천 질문 수신:', data.suggested_questions);
-            if (onSuggestedQuestions) {
-              onSuggestedQuestions(data.suggested_questions || []);
+            if (onSuggestedQuestions && suggested_questions) {
+              onSuggestedQuestions(suggested_questions);
             }
-            break;
 
-          case 'done':
-            // 스트리밍 완료
-            console.log('스트리밍 완료:', fullResponse);
             if (onDone) {
-              onDone(fullResponse);
+              onDone(result);
             }
-            eventSource.close();
-            break;
 
-          case 'error':
-            // 오류 발생
-            console.error('API 응답 오류:', data.error);
+            isDone = true;
+            return;
+          } else if (status === 'error') {
+            console.error('응답 생성 중 오류 발생');
             if (onError) {
-              onError(new Error(data.error || '응답 생성 중 오류가 발생했습니다.'));
+              onError(new Error('응답 생성 중 오류가 발생했습니다.'));
             }
-            eventSource.close();
-            break;
+            isDone = true;
+            return;
+          } else if (status === 'processing') {
+            console.log('응답 생성 중...', attempts);
+            // 생성 중인 경우 계속 대기
+          }
 
-          default:
-            console.log('알 수 없는 이벤트 타입:', data.type);
+          // 처리 중인 경우 대기 후 재시도
+          await new Promise(resolve => setTimeout(resolve, delay));
+          attempts++;
+        } catch (error) {
+          console.error('결과 폴링 중 오류 발생:', error);
+          if (onError) {
+            onError(new Error('응답 확인 중 문제가 발생했습니다.'));
+          }
+          isDone = true;
+          return;
         }
-      } catch (e) {
-        console.error('SSE 이벤트 처리 중 오류:', e, '원본 데이터:', event.data);
+      }
+
+      if (!isDone) {
+        console.error('응답 시간 초과');
         if (onError) {
-          onError(e);
+          onError(new Error('응답 시간이 초과되었습니다.'));
         }
       }
     };
 
-    // 연결 오류 처리
-    eventSource.onerror = (error) => {
-      console.error('SSE 연결 오류:', error);
-      if (onError) {
-        onError(error || new Error('서버 연결에 문제가 발생했습니다.'));
+    // 폴링 시작
+    pollResult();
+
+    // 폴링 컨트롤러 객체 (이벤트 소스와 비슷한 인터페이스 제공)
+    return {
+      close: () => {
+        isDone = true;
+        console.log('폴링 요청 종료');
       }
-      eventSource.close();
     };
-
-    // 연결 성공 처리
-    eventSource.onopen = () => {
-      console.log('SSE 연결 성공');
-    };
-
-    // EventSource 객체 반환 (호출자가 필요시 닫을 수 있도록)
-    return eventSource;
   } catch (error) {
     console.error('메시지 전송 중 오류 발생:', error);
     if (onError) {
@@ -155,98 +173,11 @@ export const sendMessageWithToken = async (message, onContentChunk, onSuggestedQ
   }
 };
 
-// 원래 메서드 - 헤더에 토큰 전달 (CORS 이슈가 있을 수 있음)
+// 원래 스트리밍 메서드 (폴링 메서드로 대체)
 export const sendMessageStream = async (message, onContentChunk, onSuggestedQuestions, onDone, onError) => {
   try {
-    // 대체 메서드 호출로 전환
-    return await sendMessageWithToken(message, onContentChunk, onSuggestedQuestions, onDone, onError);
-
-    /* 원래 코드는 주석 처리
-    // 세션이 없으면 초기화
-    if (!currentSessionId) {
-      await initializeSession();
-    }
-
-    // 인코딩된 메시지로 URL 생성
-    const encodedMessage = encodeURIComponent(message);
-    const streamUrl = `${BASE_URL}/api/chat/sessions/${currentSessionId}/stream/?message=${encodedMessage}`;
-
-    // SSE 연결 생성
-    const eventSource = new EventSource(streamUrl, {
-      headers: {
-        'Authorization': `Token ${API_TOKEN}`,
-      },
-    });
-
-    // 응답 전체 텍스트를 저장할 변수
-    let fullResponse = '';
-
-    // 다양한 이벤트 처리
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-
-        switch (data.type) {
-          case 'message_id':
-            // 새 메시지 ID 수신 (필요시 저장)
-            console.log('새 메시지 ID:', data.message_id);
-            break;
-
-          case 'content':
-            // 콘텐츠 청크 수신
-            fullResponse += data.content;
-            if (onContentChunk) {
-              onContentChunk(data.content, fullResponse);
-            }
-            break;
-
-          case 'suggested_questions':
-            // 추천 질문 수신
-            if (onSuggestedQuestions) {
-              onSuggestedQuestions(data.suggested_questions || []);
-            }
-            break;
-
-          case 'done':
-            // 스트리밍 완료
-            if (onDone) {
-              onDone(fullResponse);
-            }
-            eventSource.close();
-            break;
-
-          case 'error':
-            // 오류 발생
-            console.error('API 응답 오류:', data.error);
-            if (onError) {
-              onError(new Error(data.error || '응답 생성 중 오류가 발생했습니다.'));
-            }
-            eventSource.close();
-            break;
-
-          default:
-            console.log('알 수 없는 이벤트 타입:', data.type);
-        }
-      } catch (e) {
-        console.error('SSE 이벤트 처리 중 오류:', e);
-        if (onError) {
-          onError(e);
-        }
-      }
-    };
-
-    // 연결 오류 처리
-    eventSource.onerror = (error) => {
-      console.error('SSE 연결 오류:', error);
-      if (onError) {
-        onError(error || new Error('서버 연결에 문제가 발생했습니다.'));
-      }
-      eventSource.close();
-    };
-
-    // EventSource 객체 반환 (호출자가 필요시 닫을 수 있도록)
-    return eventSource;
-    */
+    // 폴링 메서드로 대체
+    return await sendMessageWithPolling(message, onContentChunk, onSuggestedQuestions, onDone, onError);
   } catch (error) {
     console.error('메시지 전송 중 오류 발생:', error);
     if (onError) {
@@ -278,7 +209,6 @@ export const sendMessageAsync = async (message) => {
 
     // process_id 받기
     const processId = response.data.process_id;
-
     console.log('비동기 메시지 전송 성공, process ID:', processId);
 
     // 처리 상태를 폴링으로 확인
