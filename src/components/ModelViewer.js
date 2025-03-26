@@ -734,7 +734,7 @@ const ModelViewer = ({
 
         {/* 집 모델 - 사람 모델 뒤에 배치 */}
         <HouseModel
-          position={[1.5, -1.7, -1]}
+          position={[1.5, -1.4, -1]}
           scale={isMobile ? 2 : 3}
           rotation={[0, Math.PI / 12, 0]}
         />
