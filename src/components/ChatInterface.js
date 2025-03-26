@@ -12,15 +12,35 @@ const SpeakingIndicator = () => (
   </div>
 );
 
-// 로딩 인디케이터 컴포넌트
+// 로딩 인디케이터 컴포넌트 - 개선된 애니메이션
 const LoadingIndicator = () => (
   <div className="loading-indicator">
-    <div className="loading-dot"></div>
-    <div className="loading-dot"></div>
-    <div className="loading-dot"></div>
-    <span>Processing...</span>
+    <div className="loading-circle">
+      <div className="loading-circle-inner"></div>
+    </div>
+    <div className="loading-dots">
+      <div className="loading-dot"></div>
+      <div className="loading-dot"></div>
+      <div className="loading-dot"></div>
+    </div>
+    <span>AI가 응답을 생성중이에요</span>
   </div>
 );
+
+// 타이핑 애니메이션 컴포넌트
+const TypingAnimation = ({ text }) => {
+  return (
+    <div className="typing-animation">
+      <div className="typing-bubble">
+        <div className="typing-dots">
+          <div className="typing-dot"></div>
+          <div className="typing-dot"></div>
+          <div className="typing-dot"></div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const ChatInterface = ({
   onSendMessage,
@@ -33,6 +53,7 @@ const ChatInterface = ({
   const [message, setMessage] = useState('');
   const [chatHistory, setChatHistory] = useState(initialMessages);
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
   const chatHistoryRef = useRef(null);
@@ -41,13 +62,28 @@ const ChatInterface = ({
   // 초기 메시지가 변경되면 채팅 기록 업데이트
   useEffect(() => {
     if (initialMessages.length > 0) {
-      // 초기 메시지가 업데이트되었지만, 채팅 기록이 비어있거나
-      // 초기 메시지의 길이가 채팅 기록보다 크면 채팅 기록 업데이트
-      if (chatHistory.length === 0 || initialMessages.length > chatHistory.length) {
-        setChatHistory(initialMessages);
+      setChatHistory(initialMessages);
+
+      // 메시지가 추가되면 스트리밍 상태 감지
+      const lastMessage = initialMessages[initialMessages.length - 1];
+
+      // 마지막 메시지가 봇 메시지이고, '응답을 생성하는 중...'이면 스트리밍 상태로 설정
+      if (lastMessage.sender === 'bot') {
+        if (lastMessage.text === '응답을 생성하는 중...') {
+          setIsWaitingForResponse(true);
+          setIsStreaming(false);
+        } else if (lastMessage.text !== chatHistory[chatHistory.length - 1]?.text) {
+          // 마지막 메시지 텍스트가 변경되었다면 스트리밍 상태로 설정
+          setIsStreaming(true);
+          setIsWaitingForResponse(false);
+        } else {
+          // 완료된 메시지
+          setIsStreaming(false);
+          setIsWaitingForResponse(false);
+        }
       }
     }
-  }, [initialMessages, chatHistory.length]);
+  }, [initialMessages, chatHistory]);
 
   // 채팅창 확장/축소 애니메이션
   const toggleChatExpansion = (e) => {
@@ -140,6 +176,7 @@ const ChatInterface = ({
 
     // 응답 대기 상태 설정
     setIsWaitingForResponse(true);
+    setIsStreaming(false);
 
     try {
       // 부모 컴포넌트에서 AI 응답 생성 함수 호출
@@ -164,9 +201,10 @@ const ChatInterface = ({
         sender: 'bot'
       };
       setChatHistory(prev => [...prev, errorMessage]);
-    } finally {
+
       // 응답 대기 상태 해제
       setIsWaitingForResponse(false);
+      setIsStreaming(false);
     }
   };
 
@@ -200,7 +238,7 @@ const ChatInterface = ({
     if (chatHistory.length === 0) {
       return (
         <div className="collapsed-chat-placeholder">
-          <p>Start a conversation with the AI assistant...</p>
+          <p>AI 비서와 대화를 시작해보세요...</p>
         </div>
       );
     }
@@ -215,10 +253,16 @@ const ChatInterface = ({
             {lastMessage.sender === 'bot' ? 'AI:' : 'You:'}
           </div>
           <div className="last-message-text">
-            {lastMessage.text.length > 120
-              ? `${lastMessage.text.substring(0, 120)}...`
-              : lastMessage.text
-            }
+            {lastMessage.text === '응답을 생성하는 중...' ? (
+              <>
+                응답을 생성하는 중
+                <SpeakingIndicator />
+              </>
+            ) : lastMessage.text.length > 120 ? (
+              `${lastMessage.text.substring(0, 120)}...`
+            ) : (
+              lastMessage.text
+            )}
             {lastMessage.sender === 'bot' && isSpeaking && <SpeakingIndicator />}
           </div>
         </div>
@@ -233,10 +277,10 @@ const ChatInterface = ({
     >
       <div className="chat-header" onClick={toggleChatExpansion}>
         <div className="chat-title">
-          <span>Chat with AI Assistant</span>
+          <span>Chat with Avatar</span>
           {isListening && <span className="listening-indicator">Listening...</span>}
         </div>
-        <button className="toggle-button" aria-label={isExpanded ? "Collapse chat" : "Expand chat"}>
+        <button className="toggle-button" aria-label={isExpanded ? "대화창 접기" : "대화창 펼치기"}>
           {isExpanded ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
         </button>
       </div>
@@ -250,28 +294,44 @@ const ChatInterface = ({
       {isExpanded && (
         <>
           <div className="chat-history" ref={chatHistoryRef}>
-            {chatHistory.map(chat => (
+            {chatHistory.map((chat, index) => (
               <div
                 key={chat.id}
-                className={`chat-message ${chat.sender === 'user' ? 'user-message' : 'bot-message'}`}
+                className={`chat-message ${chat.sender === 'user' ? 'user-message' : 'bot-message'} ${
+                  isStreaming && index === chatHistory.length - 1 && chat.sender === 'bot' ? 'streaming' : ''
+                }`}
               >
-                {chat.text}
+                {chat.text === '응답을 생성하는 중...' ? (
+                  <LoadingIndicator />
+                ) : (
+                  chat.text
+                )}
+
+                {/* 음성 재생 중이고 마지막 메시지일 때 표시 */}
                 {chat.sender === 'bot' &&
                   chat.id === `bot-${chatHistory.length - 1}` &&
                   isSpeaking &&
                   <SpeakingIndicator />
                 }
+
+                {/* 스트리밍 중이고 마지막 메시지일 때 타이핑 애니메이션 표시 */}
+                {isStreaming &&
+                  index === chatHistory.length - 1 &&
+                  chat.sender === 'bot' &&
+                  !isSpeaking &&
+                  <TypingAnimation />
+                }
               </div>
             ))}
 
-            {isWaitingForResponse && (
-              <div className="chat-message bot-message">
+            {isWaitingForResponse && !isStreaming && (
+              <div className="chat-message bot-message loading">
                 <LoadingIndicator />
               </div>
             )}
 
             {showScrollIndicator && (
-              <button className="scroll-indicator" onClick={scrollToBottom} aria-label="Scroll to bottom">
+              <button className="scroll-indicator" onClick={scrollToBottom} aria-label="아래로 스크롤">
                 <ChevronDown size={16} />
               </button>
             )}
@@ -284,7 +344,7 @@ const ChatInterface = ({
                 type="text"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Type your message..."
+                placeholder="Type your message."
                 className="chat-input"
                 disabled={isWaitingForResponse || isListening}
               />
@@ -295,7 +355,7 @@ const ChatInterface = ({
                 className={`voice-button ${isListening ? 'listening' : ''}`}
                 onClick={handleVoiceInputClick}
                 disabled={isWaitingForResponse}
-                aria-label="Voice input"
+                aria-label="음성 입력"
               >
                 <Mic size={18} />
               </button>
@@ -303,7 +363,7 @@ const ChatInterface = ({
               <button
                 type="submit"
                 className={`send-button ${isWaitingForResponse || message.trim() === '' ? 'disabled' : ''}`}
-                aria-label="Send message"
+                aria-label="메시지 보내기"
                 disabled={isWaitingForResponse || message.trim() === ''}
               >
                 <Send size={18} />

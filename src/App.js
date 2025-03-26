@@ -1,4 +1,4 @@
-// App.js with custom API integration
+// App.js with custom API integration and background change detection
 import React, { useState, useEffect, useRef } from 'react';
 import ModelViewer from './components/ModelViewer';
 import ChatInterface from './components/ChatInterface';
@@ -19,6 +19,8 @@ function App() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [background, setBackground] = useState('default');
   const [currentModel, setCurrentModel] = useState('model1');
+  const [secondModelPath, setSecondModelPath] = useState('model5'); // 두 번째 모델 경로
+  const [secondModelPosition, setSecondModelPosition] = useState([0.8, -0.8, 0]); // 두 번째 모델 위치
   const [showWelcomePopup, setShowWelcomePopup] = useState(false);
   const [microphoneAccess, setMicrophoneAccess] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -36,7 +38,46 @@ function App() {
   const { lipSyncData } = useLipSync(currentMessage, isSpeaking);
 
   const audioRef = useRef(null);
-  const welcomeMessageRef = useRef('안녕하세요! 저는 메타디움 아바타 비서입니다. 무엇을 도와드릴까요?');
+  const welcomeMessageRef = useRef('Hello, I am your avatar. How can I help you?');
+
+  // 배경 변경 명령 감지 함수
+  const detectEnvironmentChangeCommand = (userMessage, aiResponse) => {
+    // 사용자 메시지에서 배경 변경 의도 확인
+    const backgroundChangeRequests = {
+      '밤': /밤.*바꿔|배경.*밤|(밤|저녁|야간).*변경|밤.*설정|꺼줄래|어둡게|불.*꺼/i,
+      '석양': /석양.*바꿔|배경.*석양|노을.*변경|석양.*설정/i,
+      '아침': /아침.*바꿔|배경.*아침|새벽.*변경|아침.*설정|dawn.*변경/i,
+      '기본': /기본.*바꿔|배경.*기본|주간.*변경|낮.*설정|기본.*배경|밝게/i
+    };
+
+    // 사용자 메시지에서 배경 변경 요청 확인
+    let requestedBackground = null;
+    for (const [bgType, pattern] of Object.entries(backgroundChangeRequests)) {
+      if (pattern.test(userMessage.toLowerCase())) {
+        requestedBackground = bgType === '기본' ? 'default' : bgType;
+        break;
+      }
+    }
+
+    // AI 응답에서 긍정적인 답변 확인 (변경을 승인하는 내용)
+    const positiveResponse = /네|알겠|변경|바꿨|적용|완료|했어요|준비|바꾸|설정/i.test(aiResponse);
+
+    // 배경 변경 요청이 있고 AI가 긍정적으로 응답했다면 배경 변경
+    if (requestedBackground && positiveResponse) {
+      console.log(`배경 변경 요청 감지: ${requestedBackground}`);
+
+      // 여기에서 실제 배경을 변경
+      if (requestedBackground === 'default') {
+        handleChangeBackground('default');
+      } else if (requestedBackground === '밤') {
+        handleChangeBackground('night');
+      } else if (requestedBackground === '석양') {
+        handleChangeBackground('sunset');
+      } else if (requestedBackground === '아침') {
+        handleChangeBackground('dawn');
+      }
+    }
+  };
 
   // 페이지 로드 시 초기화 작업
   useEffect(() => {
@@ -254,68 +295,94 @@ function App() {
 
   // 텍스트를 음성으로 변환하고 재생하는 함수
   const handleSpeech = async (text) => {
-    try {
-      // 이전 오디오가 재생 중이면 중지
-      if (audioRef.current) {
-        audioRef.current.pause();
-        URL.revokeObjectURL(audioRef.current.src);
-        audioRef.current = null;
+  try {
+    // 이전 오디오가 재생 중이면 중지
+    if (audioRef.current) {
+      const currentAudio = audioRef.current;
+      const currentSrc = currentAudio.src;
+
+      // 일단 정지시키고
+      currentAudio.pause();
+
+      // src가 유효한 경우에만 revoke
+      if (currentSrc && currentSrc.startsWith('blob:')) {
+        URL.revokeObjectURL(currentSrc);
       }
 
-      // 메시지는 설정하되, 아직 립싱크는 활성화하지 않음
-      setCurrentMessage(text);
-      setIsSpeaking(false); // 처음에는 립싱크 비활성화
-
-      console.log("음성 합성 시작:", text);
-
-      // 음성 재생용 오디오 객체 생성
-      const voice = 'onyx'; // 남성 음성 사용
-      audioRef.current = await speakText(text, voice);
-
-      // 오디오 로딩 상태 관련 이벤트
-      audioRef.current.addEventListener('canplay', () => {
-        console.log("오디오 재생 준비 완료");
-      });
-
-      // 오디오 재생 시작 이벤트 - 이때 립싱크 활성화
-      audioRef.current.addEventListener('play', () => {
-        console.log("오디오 재생 시작됨 - 립싱크 활성화");
-        setIsSpeaking(true); // 오디오 재생이 실제로 시작될 때 립싱크 활성화
-      });
-
-      // 오디오 재생 완료 이벤트
-      audioRef.current.addEventListener('ended', () => {
-        console.log("음성 재생 완료");
-        setIsSpeaking(false); // 립싱크 비활성화
-        URL.revokeObjectURL(audioRef.current.src);
-        audioRef.current = null;
-      });
-
-      // 오디오 재생 오류 처리
-      audioRef.current.addEventListener('error', (error) => {
-        console.error('오디오 재생 오류:', error);
-        setIsSpeaking(false); // 립싱크 비활성화
-        URL.revokeObjectURL(audioRef.current.src);
-        audioRef.current = null;
-      });
-
-      // 오디오 일시정지 이벤트
-      audioRef.current.addEventListener('pause', () => {
-        console.log("오디오 일시정지됨");
-        setIsSpeaking(false); // 립싱크 비활성화
-      });
-
-      // 이벤트 리스너 설정 후 오디오 재생 시작
-      // 실제 재생은 브라우저가 오디오를 준비한 후 시작됨
-      audioRef.current.play().catch(error => {
-        console.error('오디오 재생 시작 오류:', error);
-        setIsSpeaking(false);
-      });
-    } catch (error) {
-      console.error('음성 재생 중 오류 발생:', error);
-      setIsSpeaking(false);
+      audioRef.current = null;
     }
-  };
+
+    // 메시지는 설정하되, 아직 립싱크는 활성화하지 않음
+    setCurrentMessage(text);
+    setIsSpeaking(false); // 처음에는 립싱크 비활성화
+
+    console.log("음성 합성 시작:", text);
+
+    // 음성 재생용 오디오 객체 생성
+    const voice = 'onyx'; // 남성 음성 사용
+    audioRef.current = await speakText(text, voice);
+    const audio = audioRef.current; // 지역 변수에 저장하여 이벤트 핸들러 내에서 안전하게 참조
+
+    // 오디오 로딩 상태 관련 이벤트
+    audio.addEventListener('canplay', () => {
+      console.log("오디오 재생 준비 완료");
+    });
+
+    // 오디오 재생 시작 이벤트 - 이때 립싱크 활성화
+    audio.addEventListener('play', () => {
+      console.log("오디오 재생 시작됨 - 립싱크 활성화");
+      setIsSpeaking(true); // 오디오 재생이 실제로 시작될 때 립싱크 활성화
+    });
+
+    // 오디오 재생 완료 이벤트
+    audio.addEventListener('ended', () => {
+      console.log("음성 재생 완료");
+      setIsSpeaking(false); // 립싱크 비활성화
+
+      // 이 시점에서 audio.src가 존재하는지 확인
+      if (audio.src && audio.src.startsWith('blob:')) {
+        URL.revokeObjectURL(audio.src);
+      }
+
+      // 이 시점에서 audioRef.current가 아직 이 오디오 객체를 참조하는 경우에만 null로 설정
+      if (audioRef.current === audio) {
+        audioRef.current = null;
+      }
+    });
+
+    // 오디오 재생 오류 처리
+    audio.addEventListener('error', (error) => {
+      console.error('오디오 재생 오류:', error);
+      setIsSpeaking(false); // 립싱크 비활성화
+
+      // 이 시점에서 audio.src가 존재하는지 확인
+      if (audio.src && audio.src.startsWith('blob:')) {
+        URL.revokeObjectURL(audio.src);
+      }
+
+      // 이 시점에서 audioRef.current가 아직 이 오디오 객체를 참조하는 경우에만 null로 설정
+      if (audioRef.current === audio) {
+        audioRef.current = null;
+      }
+    });
+
+    // 오디오 일시정지 이벤트
+    audio.addEventListener('pause', () => {
+      console.log("오디오 일시정지됨");
+      setIsSpeaking(false); // 립싱크 비활성화
+    });
+
+    // 이벤트 리스너 설정 후 오디오 재생 시작
+    // 실제 재생은 브라우저가 오디오를 준비한 후 시작됨
+    audio.play().catch(error => {
+      console.error('오디오 재생 시작 오류:', error);
+      setIsSpeaking(false);
+    });
+  } catch (error) {
+    console.error('음성 재생 중 오류 발생:', error);
+    setIsSpeaking(false);
+  }
+};
 
   // 커스텀 API를 사용하여 메시지 전송 및 응답 처리
   const handleSendMessage = async (message) => {
@@ -337,11 +404,18 @@ function App() {
 
       // 이전 음성 재생 중이면 중지
       if (audioRef.current) {
-        audioRef.current.pause();
-        URL.revokeObjectURL(audioRef.current.src);
-        audioRef.current = null;
-        setIsSpeaking(false);
-      }
+          const currentAudio = audioRef.current;
+          const currentSrc = currentAudio.src;
+
+          currentAudio.pause();
+
+          if (currentSrc && currentSrc.startsWith('blob:')) {
+            URL.revokeObjectURL(currentSrc);
+          }
+
+          audioRef.current = null;
+          setIsSpeaking(false);
+        }
 
       // 진행 중인 스트리밍 연결 종료
       if (activeStreamRef.current) {
@@ -357,9 +431,14 @@ function App() {
       // 응답 생성 중임을 표시
       setCurrentMessage('응답을 생성하는 중...');
 
+      // 로딩 상태 메시지 추가
+      const loadingMessage = { role: 'assistant', content: '응답을 생성하는 중...' };
+      setMessageHistory([...updatedHistory, loadingMessage]);
+
       // 응답 누적을 위한 변수
       let accumulatedResponse = '';
-      let botResponseAdded = false;
+      let voiceSynthesisQueued = false; // 음성 합성 예약 여부
+      let botResponseAdded = true; // 이미 초기 로딩 메시지를 추가했으므로 true로 설정
 
       console.log('메시지 전송 시작:', message);
 
@@ -371,24 +450,30 @@ function App() {
           console.log('청크 수신:', chunk);
           accumulatedResponse = accumulated;
 
-          // 첫 청크 수신 시 봇 응답 객체 추가
-          if (!botResponseAdded) {
-            // 봇 응답 기록 추가
-            const assistantMessage = { role: 'assistant', content: accumulated };
-            setMessageHistory(prev => [...prev, assistantMessage]);
-            botResponseAdded = true;
-          } else {
-            // 이후 청크에서는 메시지 기록의 마지막 항목 업데이트
-            const assistantMessage = { role: 'assistant', content: accumulated };
-            setMessageHistory(prev => {
-              const newHistory = [...prev];
-              newHistory[newHistory.length - 1] = assistantMessage;
-              return newHistory;
-            });
-          }
+          // 메시지 기록의 마지막 항목 업데이트
+          const assistantMessage = { role: 'assistant', content: accumulated };
+          setMessageHistory(prev => {
+            const newHistory = [...prev];
+            newHistory[newHistory.length - 1] = assistantMessage;
+            return newHistory;
+          });
 
           // 현재 메시지 업데이트 (립싱크용)
           setCurrentMessage(accumulated);
+
+          // 배경 변경 명령 감지 및 처리
+          detectEnvironmentChangeCommand(message, accumulated);
+
+          // 일정 길이 이상의 텍스트가 모이면 음성 합성 예약
+          if (accumulated.length > 50 && !voiceSynthesisQueued && !isSpeaking) {
+            voiceSynthesisQueued = true;
+
+            // 약간의 지연 후 음성 합성 시작 (더 많은 텍스트가 모이도록)
+            setTimeout(() => {
+              // 음성 합성 시작
+              handleSpeech(accumulated);
+            }, 800);
+          }
         },
         // 추천 질문 처리 콜백
         (questions) => {
@@ -400,8 +485,15 @@ function App() {
           // 최종 응답 처리
           console.log('응답 완료:', finalResponse);
 
-          // 최종 응답으로 음성 합성 및 재생
-          handleSpeech(finalResponse);
+          // 아직 음성 합성이 시작되지 않았다면 최종 응답으로 음성 합성 및 재생
+          if (!voiceSynthesisQueued) {
+            handleSpeech(finalResponse);
+          }
+          // 이미 음성 합성이 시작됐고 현재 재생 중이라면 업데이트하지 않음
+          else if (!isSpeaking) {
+            // 재생 중이 아니면 최신 응답으로 음성 합성
+            handleSpeech(finalResponse);
+          }
 
           // 스트리밍 참조 제거
           activeStreamRef.current = null;
@@ -413,7 +505,11 @@ function App() {
 
           // 오류 메시지 기록 추가
           const errorResponse = { role: 'assistant', content: errorMessage };
-          setMessageHistory([...updatedHistory, errorResponse]);
+          setMessageHistory(prev => {
+            const newHistory = [...prev];
+            newHistory[newHistory.length - 1] = errorResponse;
+            return newHistory;
+          });
 
           setCurrentMessage(errorMessage);
 
@@ -475,13 +571,19 @@ function App() {
     setCurrentModel(newModel);
   };
 
+  // 두 번째 모델 위치 변경 핸들러 (필요한 경우 사용)
+  const handleSecondModelPositionChange = (newPosition) => {
+    console.log('두 번째 모델 위치 변경:', newPosition);
+    setSecondModelPosition(newPosition);
+  };
+
   return (
     <div className={`app background-${background}`}>
       {isLoading ? (
         <div className="loading-screen">
           <div className="loading-spinner"></div>
           <div className="loading-message">
-            Loading 3D model and AI capabilities...
+            Loading 3D models and AI capabilities...
           </div>
         </div>
       ) : (
@@ -498,6 +600,8 @@ function App() {
               lipSyncData={lipSyncData}
               background={background}
               modelPath={`/models/${currentModel}.glb`}
+              secondModelPath={`/models/${secondModelPath}.glb`}
+              secondModelPosition={secondModelPosition}
               isSpeaking={isSpeaking}
             />
           </div>

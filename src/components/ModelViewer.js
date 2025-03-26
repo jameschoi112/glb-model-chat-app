@@ -4,6 +4,7 @@ import { useGLTF, OrbitControls, Environment, Stars, Sky, Grid, useTexture, Clou
 import * as THREE from 'three';
 import '../styles/ModelViewer.css';
 import HouseModel from './HouseModel'; // 집 모델 컴포넌트 import
+import SecondCharacterModel from './SecondCharacterModel'; // 두 번째 캐릭터 모델 컴포넌트 import
 
 // 움직이는 구름 컴포넌트
 const Clouds = () => {
@@ -600,7 +601,14 @@ const Model = ({ lipSyncData, modelPath, position, ...props }) => {
 };
 
 // 모델 뷰어 메인 컴포넌트
-const ModelViewer = ({ lipSyncData, background = 'default', modelPath = '/models/model1.glb' }) => {
+const ModelViewer = ({
+  lipSyncData,
+  background = 'default',
+  modelPath = '/models/model1.glb',
+  secondModelPath = '/models/model5.glb', // 두 번째 모델 경로 추가
+  secondModelPosition = [1.5, -0.87, 0], // 두 번째 모델 위치 추가
+  isSpeaking = false
+}) => {
   // 모바일 장치 감지
   const [isMobile, setIsMobile] = useState(false);
 
@@ -614,7 +622,8 @@ const ModelViewer = ({ lipSyncData, background = 'default', modelPath = '/models
 
     // 모델 프리로드
     useGLTF.preload(modelPath);
-  }, [modelPath]);
+    useGLTF.preload(secondModelPath); // 두 번째 모델도 프리로드
+  }, [modelPath, secondModelPath]);
 
   // 배경에 따른 씬 분위기 설정
   const sceneColor = useMemo(() => {
@@ -704,13 +713,22 @@ const ModelViewer = ({ lipSyncData, background = 'default', modelPath = '/models
           />
         </mesh>
 
-        {/* 모델 - 현재 선택된 모델 경로 사용 */}
+        {/* 메인 모델 - 현재 선택된 모델 경로 사용 */}
         <Model
           lipSyncData={lipSyncData}
           modelPath={currentModelPath}
           position={[0, -0.87, 0]}
           scale={isMobile ? 0.9 : 1}
           rotation={[0, 0, 0]}
+          castShadow
+        />
+
+        {/* 두 번째 캐릭터 모델 추가 */}
+        <SecondCharacterModel
+          modelPath={secondModelPath}
+          position={secondModelPosition}
+          scale={isMobile ? 0.9 : 1}
+          rotation={[0, Math.PI / -2, 0]} // 약간 메인 캐릭터 쪽으로 회전
           castShadow
         />
 
@@ -763,3 +781,5 @@ export default ModelViewer;
 
 // 기본 모델 프리로딩
 useGLTF.preload('/models/model1.glb');
+// 두 번째 모델도 프리로딩
+useGLTF.preload('/models/model5.glb');
