@@ -23,7 +23,7 @@ const LoadingIndicator = () => (
       <div className="loading-dot"></div>
       <div className="loading-dot"></div>
     </div>
-    <span>AI가 응답을 생성중이에요</span>
+    <span>Avatar is thinking</span>
   </div>
 );
 
@@ -294,48 +294,53 @@ const ChatInterface = ({
       {isExpanded && (
         <>
           <div className="chat-history" ref={chatHistoryRef}>
-            {chatHistory.map((chat, index) => (
-              <div
-                key={chat.id}
-                className={`chat-message ${chat.sender === 'user' ? 'user-message' : 'bot-message'} ${
-                  isStreaming && index === chatHistory.length - 1 && chat.sender === 'bot' ? 'streaming' : ''
-                }`}
-              >
-                {chat.text === '응답을 생성하는 중...' ? (
-                  <LoadingIndicator />
-                ) : (
-                  chat.text
-                )}
-
-                {/* 음성 재생 중이고 마지막 메시지일 때 표시 */}
-                {chat.sender === 'bot' &&
-                  chat.id === `bot-${chatHistory.length - 1}` &&
-                  isSpeaking &&
-                  <SpeakingIndicator />
-                }
-
-                {/* 스트리밍 중이고 마지막 메시지일 때 타이핑 애니메이션 표시 */}
-                {isStreaming &&
-                  index === chatHistory.length - 1 &&
-                  chat.sender === 'bot' &&
-                  !isSpeaking &&
-                  <TypingAnimation />
-                }
-              </div>
-            ))}
-
-            {isWaitingForResponse && !isStreaming && (
-              <div className="chat-message bot-message loading">
+          {chatHistory.map((chat, index) => (
+            <div
+              key={chat.id}
+              className={`chat-message ${chat.sender === 'user' ? 'user-message' : 'bot-message'} ${
+                isStreaming && index === chatHistory.length - 1 && chat.sender === 'bot' ? 'streaming' : ''
+              }`}
+            >
+              {chat.text === '응답을 생성하는 중...' ? (
                 <LoadingIndicator />
-              </div>
-            )}
+              ) : (
+                chat.text
+              )}
 
-            {showScrollIndicator && (
-              <button className="scroll-indicator" onClick={scrollToBottom} aria-label="아래로 스크롤">
-                <ChevronDown size={16} />
-              </button>
-            )}
-          </div>
+              {/* 음성 재생 중이고 마지막 메시지일 때 표시 */}
+              {chat.sender === 'bot' &&
+                chat.id === `bot-${chatHistory.length - 1}` &&
+                isSpeaking &&
+                <SpeakingIndicator />
+              }
+
+              {/* 스트리밍 중이고 마지막 메시지일 때 타이핑 애니메이션 표시 */}
+              {isStreaming &&
+                index === chatHistory.length - 1 &&
+                chat.sender === 'bot' &&
+                !isSpeaking &&
+                <TypingAnimation />
+              }
+            </div>
+          ))}
+
+          {/*
+            채팅 기록에 '응답을 생성하는 중...' 메시지가 없을 때만
+            별도의 로딩 인디케이터를 표시
+          */}
+          {isWaitingForResponse && !isStreaming &&
+           !chatHistory.some(chat => chat.text === '응답을 생성하는 중...') && (
+            <div className="chat-message bot-message loading">
+              <LoadingIndicator />
+            </div>
+          )}
+
+          {showScrollIndicator && (
+            <button className="scroll-indicator" onClick={scrollToBottom} aria-label="아래로 스크롤">
+              <ChevronDown size={16} />
+            </button>
+          )}
+        </div>
 
           <div className="chat-input-area">
             <form onSubmit={handleSendMessage}>
