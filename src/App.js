@@ -1,4 +1,4 @@
-// App.js with voice recognition integration
+// App.js with custom API integration
 import React, { useState, useEffect, useRef } from 'react';
 import ModelViewer from './components/ModelViewer';
 import ChatInterface from './components/ChatInterface';
@@ -6,7 +6,8 @@ import DateTimeDisplay from './components/DateTimeDisplay';
 import AdminPanel from './components/AdminPanel';
 import WelcomePopup from './components/WelcomePopup';
 import useLipSync from './components/LipSync';
-import { generateAIResponse, speakText } from './services/openaiVoiceService';
+import { initializeSession, sendMessageStream } from './services/customChatService';
+import { speakText } from './services/openaiVoiceService'; // TTS는 기존 서비스 재사용
 import { startSpeechRecognition, stopSpeechRecognition } from './services/speechRecognitionService';
 import './App.css';
 
@@ -22,6 +23,10 @@ function App() {
   const [microphoneAccess, setMicrophoneAccess] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [suggestedQuestions, setSuggestedQuestions] = useState([]);
+
+  // 현재 활성화된 스트리밍 연결 참조
+  const activeStreamRef = useRef(null);
 
   // 음성 인식 인스턴스 참조
   const recognitionRef = useRef(null);
@@ -30,9 +35,9 @@ function App() {
   const { lipSyncData } = useLipSync(currentMessage, isSpeaking);
 
   const audioRef = useRef(null);
-  const welcomeMessageRef = useRef('Hello! I\'m your Avatar Assistant');
+  const welcomeMessageRef = useRef('Hello! I`m your avatar!');
 
-  // 페이지 로드 시 모바일 여부 감지
+  // 페이지 로드 시 초기화 작업
   useEffect(() => {
     const checkMobile = () => {
       const userAgent = navigator.userAgent || navigator.vendor || window.opera;
@@ -43,22 +48,44 @@ function App() {
     checkMobile();
     window.addEventListener('resize', checkMobile);
 
-    // 모델 로딩 시뮬레이션
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-      // 로딩 완료 후 웰컴 팝업 표시
-      setShowWelcomePopup(true);
-    }, 2000);
+    // 세션 초기화 및 모델 로드 시뮬레이션
+    const setupApp = async () => {
+      try {
+        // 챗봇 세션 초기화
+        await initializeSession();
+
+        // 모델 로딩 시뮬레이션
+        setTimeout(() => {
+          setIsLoading(false);
+          // 로딩 완료 후 웰컴 팝업 표시
+          setShowWelcomePopup(true);
+        }, 2000);
+      } catch (error) {
+        console.error('앱 초기화 중 오류 발생:', error);
+        // 오류가 있어도 UI는 표시
+        setTimeout(() => {
+          setIsLoading(false);
+          setShowWelcomePopup(true);
+        }, 2000);
+      }
+    };
+
+    setupApp();
 
     return () => {
       window.removeEventListener('resize', checkMobile);
-      clearTimeout(timer);
 
       // 오디오 정리
       if (audioRef.current) {
         audioRef.current.pause();
         URL.revokeObjectURL(audioRef.current.src);
         audioRef.current = null;
+      }
+
+      // 진행 중인 스트리밍 연결 종료
+      if (activeStreamRef.current) {
+        activeStreamRef.current.close();
+        activeStreamRef.current = null;
       }
 
       // 음성 인식 정리
@@ -68,53 +95,53 @@ function App() {
 
   // 음성 인식 시작 함수
   const startVoiceRecognition = () => {
-  // 이미 듣고 있다면 중지
-  if (isListening) {
-    stopSpeechRecognition(recognitionRef.current);
-    setIsListening(false);
-    setTranscript('');
-    return;
-  }
-
-  // 모바일 환경 감지
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-  // 모바일에서는 특별 처리
-  if (isMobile) {
-    // 먼저 사용자에게 안내
-    if (!microphoneAccess) {
-      alert("음성 인식을 시작합니다. 마이크 권한 요청이 표시되면 '허용'을 눌러주세요.");
+    // 이미 듣고 있다면 중지
+    if (isListening) {
+      stopSpeechRecognition(recognitionRef.current);
+      setIsListening(false);
+      setTranscript('');
+      return;
     }
 
-    // 약간의 지연 후 권한 요청 (모바일에서 더 안정적)
-    setTimeout(() => {
-      navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+    // 모바일 환경 감지
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+    // 모바일에서는 특별 처리
+    if (isMobile) {
+      // 먼저 사용자에게 안내
+      if (!microphoneAccess) {
+        alert("음성 인식을 시작합니다. 마이크 권한 요청이 표시되면 '허용'을 눌러주세요.");
+      }
+
+      // 약간의 지연 후 권한 요청 (모바일에서 더 안정적)
+      setTimeout(() => {
+        navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+          .then(() => {
+            setMicrophoneAccess(true);
+
+            // 권한 획득 성공 후 약간의 지연
+            setTimeout(() => {
+              initializeVoiceRecognition();
+            }, 300);
+          })
+          .catch(error => {
+            console.error('모바일 마이크 접근 권한이 거부되었습니다:', error);
+            alert('음성 인식을 위해서는 마이크 접근 권한이 필요합니다. 브라우저 설정에서 권한을 허용해주세요.');
+          });
+      }, 300);
+    } else {
+      // 데스크톱에서는 기존 방식대로
+      navigator.mediaDevices.getUserMedia({ audio: true })
         .then(() => {
           setMicrophoneAccess(true);
-
-          // 권한 획득 성공 후 약간의 지연
-          setTimeout(() => {
-            initializeVoiceRecognition();
-          }, 300);
+          initializeVoiceRecognition();
         })
         .catch(error => {
-          console.error('모바일 마이크 접근 권한이 거부되었습니다:', error);
-          alert('음성 인식을 위해서는 마이크 접근 권한이 필요합니다. 브라우저 설정에서 권한을 허용해주세요.');
+          console.error('마이크 접근 권한이 거부되었습니다:', error);
+          alert('음성 인식을 위해서는 마이크 접근 권한이 필요합니다.');
         });
-    }, 300);
-  } else {
-    // 데스크톱에서는 기존 방식대로
-    navigator.mediaDevices.getUserMedia({ audio: true })
-      .then(() => {
-        setMicrophoneAccess(true);
-        initializeVoiceRecognition();
-      })
-      .catch(error => {
-        console.error('마이크 접근 권한이 거부되었습니다:', error);
-        alert('음성 인식을 위해서는 마이크 접근 권한이 필요합니다.');
-      });
-  }
-};
+    }
+  };
 
   // 음성 인식 초기화 함수
   const initializeVoiceRecognition = () => {
@@ -268,7 +295,7 @@ function App() {
     }
   };
 
-  // OpenAI API를 사용하여 응답 생성
+  // 커스텀 API를 사용하여 메시지 전송 및 응답 처리
   const handleSendMessage = async (message) => {
     try {
       // 음성 인식 중이라면 중지
@@ -285,27 +312,94 @@ function App() {
         setIsSpeaking(false);
       }
 
+      // 진행 중인 스트리밍 연결 종료
+      if (activeStreamRef.current) {
+        activeStreamRef.current.close();
+        activeStreamRef.current = null;
+      }
+
       // 사용자 메시지 기록 추가
       const userMessage = { role: 'user', content: message };
       const updatedHistory = [...messageHistory, userMessage];
       setMessageHistory(updatedHistory);
 
-      // AI 응답 생성 중임을 표시
+      // 응답 생성 중임을 표시
       setCurrentMessage('응답을 생성하는 중...');
 
-      // OpenAI API 호출
-      const aiResponse = await generateAIResponse(updatedHistory);
+      // 응답 누적을 위한 변수
+      let accumulatedResponse = '';
+      let botResponseObj = null;
 
-      // AI 응답 기록 추가
-      const assistantMessage = { role: 'assistant', content: aiResponse };
-      setMessageHistory([...updatedHistory, assistantMessage]);
+      // 스트리밍 응답 처리 시작
+      const eventSource = await sendMessageStream(
+        message,
+        // 콘텐츠 청크 처리 콜백
+        (chunk, accumulated) => {
+          accumulatedResponse = accumulated;
+          // 첫 응답 청크에서 봇 응답 객체 생성
+          if (!botResponseObj) {
+            botResponseObj = {
+              id: `bot-response-${updatedHistory.length}`,
+              text: accumulated,
+              sender: 'bot'
+            };
+            // 메시지 기록 업데이트 (첫 응답 시)
+            const assistantMessage = { role: 'assistant', content: accumulated };
+            setMessageHistory([...updatedHistory, assistantMessage]);
+          } else {
+            // 이후 청크에서는 메시지 기록의 마지막 항목 업데이트
+            const assistantMessage = { role: 'assistant', content: accumulated };
+            setMessageHistory(prevHistory => {
+              const newHistory = [...prevHistory];
+              newHistory[newHistory.length - 1] = assistantMessage;
+              return newHistory;
+            });
+          }
 
-      // AI 응답을 음성으로 변환하여 재생
-      handleSpeech(aiResponse);
+          // 현재 메시지 업데이트 (립싱크용)
+          setCurrentMessage(accumulated);
+        },
+        // 추천 질문 처리 콜백
+        (questions) => {
+          setSuggestedQuestions(questions);
+        },
+        // 완료 처리 콜백
+        (finalResponse) => {
+          // 최종 응답 처리
+          console.log('응답 완료:', finalResponse);
 
+          // 최종 응답으로 음성 합성 및 재생
+          handleSpeech(finalResponse);
+
+          // 스트리밍 참조 제거
+          activeStreamRef.current = null;
+        },
+        // 오류 처리 콜백
+        (error) => {
+          console.error('응답 생성 중 오류 발생:', error);
+          const errorMessage = '죄송합니다, 응답을 생성하는 중에 문제가 발생했습니다.';
+
+          // 오류 메시지 기록 추가
+          const errorResponse = { role: 'assistant', content: errorMessage };
+          setMessageHistory([...updatedHistory, errorResponse]);
+
+          setCurrentMessage(errorMessage);
+
+          // 오류 메시지도 음성으로 변환
+          handleSpeech(errorMessage);
+
+          // 스트리밍 참조 제거
+          activeStreamRef.current = null;
+        }
+      );
+
+      // 활성 스트리밍 참조 저장
+      activeStreamRef.current = eventSource;
+
+      // 초기 빈 응답 객체 반환 (UI 업데이트를 위해)
       return {
         id: `bot-response-${updatedHistory.length}`,
-        text: aiResponse,
+        text: '응답을 생성하는 중...',
         sender: 'bot'
       };
     } catch (error) {
@@ -387,6 +481,21 @@ function App() {
                 sender: msg.role === 'assistant' ? 'bot' : 'user'
               }))}
             />
+
+            {/* 추천 질문 UI (필요시 구현) */}
+            {suggestedQuestions.length > 0 && (
+              <div className="suggested-questions">
+                {suggestedQuestions.map((question, index) => (
+                  <button
+                    key={index}
+                    className="suggested-question-btn"
+                    onClick={() => handleSendMessage(question)}
+                  >
+                    {question}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* 음성 인식 중일 때 인식 텍스트 표시 (디버깅용, 필요 시 활성화) */}
