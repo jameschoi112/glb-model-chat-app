@@ -6,24 +6,45 @@ const WelcomePopup = ({ onActivate, onClose }) => {
   const [step, setStep] = useState(1);
 
   const handleMicrophonePermission = () => {
-    // Check if browser supports getUserMedia
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      navigator.mediaDevices.getUserMedia({ audio: true })
+  // 모바일 환경 감지
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    // iOS 사파리에서는 특별 처리 필요
+    if (isIOS) {
+      // iOS에서는 안내 메시지를 먼저 표시
+      alert("마이크 접근 권한이 필요합니다. '허용'을 눌러주세요.");
+    }
+
+    // 권한 요청 전 약간의 지연 (특히 iOS에서 효과적)
+    setTimeout(() => {
+      navigator.mediaDevices.getUserMedia({ audio: true, video: false })
         .then((stream) => {
-          // Stop all tracks after getting permission
+          // 스트림 정리
           stream.getTracks().forEach(track => track.stop());
-          onActivate();
+
+          // 권한 획득 성공 후 약간의 지연
+          setTimeout(() => {
+            onActivate();
+          }, 300);
         })
         .catch((error) => {
-          console.error('Microphone permission denied:', error);
-          // Move to error state if permission denied
-          setStep(3);
+          console.error('모바일 마이크 권한 오류:', error);
+
+          // 모바일에서는 더 친절한 오류 메시지
+          if (isMobile) {
+            alert("마이크 접근이 거부되었습니다. 브라우저 설정에서 마이크 권한을 허용해주세요.");
+          }
+          setStep(3); // 오류 상태로 전환
         });
-    } else {
-      console.error('getUserMedia is not supported in this browser');
-      setStep(3);
-    }
-  };
+    }, 500); // 모바일에서는 약간의 지연이 도움됨
+  } else {
+    console.error('getUserMedia is not supported in this browser');
+    alert("이 브라우저는 마이크 접근을 지원하지 않습니다. 다른 브라우저를 사용해보세요.");
+    setStep(3);
+  }
+};
 
   return (
     <div className="welcome-popup-overlay">

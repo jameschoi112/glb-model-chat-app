@@ -68,22 +68,53 @@ function App() {
 
   // 음성 인식 시작 함수
   const startVoiceRecognition = () => {
-    // 이미 마이크에 접근할 수 있는지 확인
+  // 이미 듣고 있다면 중지
+  if (isListening) {
+    stopSpeechRecognition(recognitionRef.current);
+    setIsListening(false);
+    setTranscript('');
+    return;
+  }
+
+  // 모바일 환경 감지
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  // 모바일에서는 특별 처리
+  if (isMobile) {
+    // 먼저 사용자에게 안내
     if (!microphoneAccess) {
-      // 먼저 마이크 접근 권한 요청
-      navigator.mediaDevices.getUserMedia({ audio: true })
+      alert("음성 인식을 시작합니다. 마이크 권한 요청이 표시되면 '허용'을 눌러주세요.");
+    }
+
+    // 약간의 지연 후 권한 요청 (모바일에서 더 안정적)
+    setTimeout(() => {
+      navigator.mediaDevices.getUserMedia({ audio: true, video: false })
         .then(() => {
           setMicrophoneAccess(true);
-          initializeVoiceRecognition();
+
+          // 권한 획득 성공 후 약간의 지연
+          setTimeout(() => {
+            initializeVoiceRecognition();
+          }, 300);
         })
         .catch(error => {
-          console.error('마이크 접근 권한이 거부되었습니다:', error);
-          alert('음성 인식을 위해서는 마이크 접근 권한이 필요합니다.');
+          console.error('모바일 마이크 접근 권한이 거부되었습니다:', error);
+          alert('음성 인식을 위해서는 마이크 접근 권한이 필요합니다. 브라우저 설정에서 권한을 허용해주세요.');
         });
-    } else {
-      initializeVoiceRecognition();
-    }
-  };
+    }, 300);
+  } else {
+    // 데스크톱에서는 기존 방식대로
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(() => {
+        setMicrophoneAccess(true);
+        initializeVoiceRecognition();
+      })
+      .catch(error => {
+        console.error('마이크 접근 권한이 거부되었습니다:', error);
+        alert('음성 인식을 위해서는 마이크 접근 권한이 필요합니다.');
+      });
+  }
+};
 
   // 음성 인식 초기화 함수
   const initializeVoiceRecognition = () => {
