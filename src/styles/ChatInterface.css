@@ -1,156 +1,56 @@
-/* Enhanced ChatInterface.css with professional design */
+/* ChatInterface.css - 마크다운 스타일 추가 */
 .chat-container {
-  background-color: rgba(22, 24, 35, 0.85);
-  border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  background-color: var(--primary-bg);
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(255, 255, 255, 0.1);
   position: relative;
-  z-index: 100;
-  backdrop-filter: blur(12px);
-  max-width: 500px;
-  margin: 0 auto;
   width: 100%;
+  height: 100%;
   overflow: hidden;
-}
-
-/* Collapsed state */
-.chat-container.collapsed {
-  height: 140px;
-}
-
-/* Expanded state */
-.chat-container.expanded {
-  height: 350px;
 }
 
 /* Chat header */
 .chat-header {
-  padding: 12px 16px;
+  padding: 16px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: rgba(30, 30, 42, 0.95);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  cursor: pointer;
-  transition: background-color 0.2s;
-  border-radius: 16px 16px 0 0;
-}
-
-.chat-header:hover {
-  background-color: rgba(40, 40, 52, 0.95);
+  background-color: var(--secondary-bg);
+  border-bottom: 1px solid var(--border-color);
+  z-index: 10;
 }
 
 .chat-title {
-  color: white;
-  font-weight: 500;
+  color: var(--accent-color);
+  font-weight: 600;
   display: flex;
   align-items: center;
   gap: 8px;
+  font-size: 16px;
 }
 
 .listening-indicator {
-  color: #0084ff;
+  color: var(--accent-color);
   animation: pulse 1.5s infinite;
   font-size: 0.85em;
   padding: 2px 8px;
-  background-color: rgba(0, 132, 255, 0.1);
+  background-color: var(--accent-light);
   border-radius: 12px;
 }
 
-.toggle-button {
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.7);
-  cursor: pointer;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-
-.toggle-button:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: white;
-}
-
-/* Collapsed content */
-.collapsed-content {
-  flex: 1;
-  overflow: hidden;
-  padding: 12px 16px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.collapsed-content:hover {
-  background-color: rgba(255, 255, 255, 0.03);
-}
-
-.collapsed-chat-placeholder {
-  color: rgba(255, 255, 255, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  font-size: 14px;
-}
-
-.collapsed-chat-content {
-  height: 100%;
-  overflow: hidden;
-}
-
-.last-message {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px 12px;
-  border-radius: 12px;
-  font-size: 14px;
-}
-
-.last-message.bot {
-  background-color: rgba(0, 132, 255, 0.12);
-  color: rgba(255, 255, 255, 0.9);
-  border-left: 3px solid #0084ff;
-}
-
-.last-message.user {
-  background-color: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.9);
-  border-left: 3px solid rgba(255, 255, 255, 0.3);
-}
-
-.last-message-sender {
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.last-message-text {
-  line-height: 1.4;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Chat history */
+/* Chat history - takes all available space */
 .chat-history {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  scrollbar-color: var(--text-muted) transparent;
   position: relative;
+  background-color: var(--primary-bg);
+  margin-bottom: 80px; /* Ensure space for fixed input at bottom */
 }
 
 .chat-history::-webkit-scrollbar {
@@ -162,7 +62,7 @@
 }
 
 .chat-history::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: var(--text-muted);
   border-radius: 3px;
 }
 
@@ -186,7 +86,7 @@
 
 .user-message {
   align-self: flex-end;
-  background-color: #0084ff;
+  background-color: var(--accent-color);
   color: white;
   border-bottom-right-radius: 3px;
   margin-left: 15%;
@@ -194,31 +94,31 @@
 
 .bot-message {
   align-self: flex-start;
-  background-color: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.95);
+  background-color: var(--bot-msg-bg);
+  color: var(--text-primary);
   border-bottom-left-radius: 3px;
   margin-right: 15%;
-  border-left: 3px solid rgba(0, 132, 255, 0.7);
+  border-left: 3px solid var(--accent-color);
 }
 
-/* 스트리밍 중인 메시지에 애니메이션 효과 */
+/* Streaming message animation effect */
 .bot-message.streaming {
-  border-left: 3px solid #00a8ff;
-  box-shadow: 0 3px 15px rgba(0, 132, 255, 0.2);
-  background-color: rgba(255, 255, 255, 0.12);
+  border-left: 3px solid var(--accent-color);
+  box-shadow: 0 3px 15px rgba(122, 162, 247, 0.2);
+  background-color: var(--tertiary-bg);
 }
 
 /* Scroll indicator */
 .scroll-indicator {
   position: absolute;
-  bottom: 10px;
+  bottom: 90px; /* Positioned above input area */
   right: 10px;
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background-color: rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
+  background-color: var(--secondary-bg);
+  border: 1px solid var(--border-color);
+  color: var(--accent-color);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -230,7 +130,7 @@
 }
 
 .scroll-indicator:hover {
-  background-color: rgba(0, 0, 0, 0.8);
+  background-color: var(--accent-light);
   transform: translateY(-2px);
 }
 
@@ -240,11 +140,16 @@
   60% { transform: translateY(-3px); }
 }
 
-/* Chat input area */
+/* Chat input area - fixed at bottom */
 .chat-input-area {
-  padding: 12px 16px;
-  background-color: rgba(30, 30, 42, 0.95);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 16px 20px;
+  background-color: var(--secondary-bg);
+  border-top: 1px solid var(--border-color);
+  z-index: 10;
+  width: 100%;
+  position: absolute;
+  bottom: 0;
+  left: 0;
 }
 
 .chat-input-area form {
@@ -255,32 +160,32 @@
 
 .chat-input {
   flex: 1;
-  padding: 10px 16px;
+  padding: 12px 18px;
   border-radius: 25px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background-color: rgba(255, 255, 255, 0.05);
-  color: white;
+  border: 1px solid var(--border-color);
+  background-color: var(--tertiary-bg);
+  color: var(--text-primary);
   outline: none;
   font-size: 14px;
   transition: all 0.3s ease;
 }
 
 .chat-input:focus {
-  background-color: rgba(255, 255, 255, 0.08);
-  border-color: rgba(0, 132, 255, 0.5);
-  box-shadow: 0 0 0 3px rgba(0, 132, 255, 0.15);
+  background-color: rgba(44, 48, 72, 0.9);
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px rgba(122, 162, 247, 0.15);
 }
 
 .chat-input::placeholder {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-muted);
 }
 
 .send-button, .voice-button {
   border: none;
   color: white;
   border-radius: 50%;
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -290,15 +195,15 @@
 }
 
 .send-button {
-  background-color: #0084ff;
+  background-color: var(--accent-color);
 }
 
 .voice-button {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(122, 162, 247, 0.3);
 }
 
 .voice-button.listening {
-  background-color: #0084ff;
+  background-color: var(--accent-color);
   animation: pulse 1.5s infinite;
 }
 
@@ -307,11 +212,11 @@
 }
 
 .send-button:hover {
-  background-color: #0073e6;
+  background-color: var(--accent-hover);
 }
 
 .voice-button:hover {
-  background-color: rgba(255, 255, 255, 0.15);
+  background-color: rgba(122, 162, 247, 0.5);
 }
 
 .send-button:active, .voice-button:active {
@@ -319,7 +224,7 @@
 }
 
 .send-button.disabled {
-  background-color: rgba(0, 132, 255, 0.3);
+  background-color: rgba(122, 162, 247, 0.3);
   cursor: not-allowed;
 }
 
@@ -337,7 +242,7 @@
 }
 
 .speaking-dot {
-  background-color: #0084ff;
+  background-color: var(--accent-color);
   border-radius: 50%;
   width: 5px;
   height: 5px;
@@ -345,7 +250,7 @@
 }
 
 .bot-message .speaking-dot {
-  background-color: rgba(255, 255, 255, 0.9);
+  background-color: var(--accent-color);
 }
 
 .speaking-dot:nth-child(1) {
@@ -371,27 +276,27 @@
   }
 }
 
-/* 향상된 로딩 인디케이터 */
+/* Enhanced loading indicator */
 .loading-indicator {
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 12px;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--accent-color);
   font-size: 14px;
   gap: 12px;
   width: 100%;
   flex-wrap: wrap;
 }
 
-/* 로딩 원 애니메이션 */
+/* Loading circle animation */
 .loading-circle {
   width: 24px;
   height: 24px;
   position: relative;
   border-radius: 50%;
-  border: 2px solid rgba(0, 132, 255, 0.3);
-  border-top-color: #0084ff;
+  border: 2px solid rgba(122, 162, 247, 0.3);
+  border-top-color: var(--accent-color);
   animation: loadSpin 1s linear infinite;
 }
 
@@ -412,7 +317,7 @@
   100% { transform: rotate(360deg); }
 }
 
-/* 로딩 점 애니메이션 */
+/* Loading dots animation */
 .loading-dots {
   display: flex;
   align-items: center;
@@ -420,7 +325,7 @@
 }
 
 .loading-dot {
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: var(--accent-color);
   border-radius: 50%;
   width: 6px;
   height: 6px;
@@ -441,7 +346,7 @@
   40% { transform: scale(1); }
 }
 
-/* 타이핑 애니메이션 */
+/* Typing animation */
 .typing-animation {
   display: flex;
   margin-top: 6px;
@@ -449,7 +354,7 @@
 }
 
 .typing-bubble {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--accent-light);
   border-radius: 16px;
   padding: 6px 10px;
   display: inline-flex;
@@ -465,7 +370,7 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background-color: rgba(255, 255, 255, 0.7);
+  background-color: var(--accent-color);
   animation: typingPulse 1.4s infinite ease-in-out both;
 }
 
@@ -497,14 +402,14 @@
   position: absolute;
   top: -8px;
   right: 10px;
-  background-color: #0084ff;
+  background-color: var(--accent-color);
   border-radius: 12px;
   padding: 2px 8px;
   display: flex;
   align-items: center;
   font-size: 12px;
   color: white;
-  box-shadow: 0 2px 8px rgba(0, 132, 255, 0.4);
+  box-shadow: 0 2px 8px rgba(122, 162, 247, 0.4);
   z-index: 5;
 }
 
@@ -512,13 +417,7 @@
   background-color: white;
 }
 
-/* Highlighted chat container when speaking */
-.chat-container.speaking:not(.expanded) {
-  border-color: rgba(0, 132, 255, 0.5);
-  box-shadow: 0 8px 32px rgba(0, 132, 255, 0.3);
-}
-
-/* 로딩 중인 채팅 메시지 스타일 */
+/* Loading message style */
 .chat-message.bot-message.loading {
   background-color: transparent;
   box-shadow: none;
@@ -526,24 +425,180 @@
   padding: 8px;
 }
 
+/* 마크다운 스타일 */
+.markdown-content {
+  width: 100%;
+}
+
+/* 코드 블록 스타일 */
+.markdown-content pre {
+  background-color: rgba(30, 30, 44, 0.9);
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+  border-left: 2px solid var(--accent-color);
+}
+
+.markdown-content code {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  font-size: 13px;
+}
+
+/* 인라인 코드 스타일 */
+.markdown-content :not(pre) > code {
+  background-color: rgba(30, 30, 44, 0.6);
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  color: var(--accent-color);
+}
+
+/* 헤더 스타일 */
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+  margin-top: 16px;
+  margin-bottom: 8px;
+  color: var(--accent-color);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.markdown-content h1 {
+  font-size: 1.4em;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 5px;
+}
+
+.markdown-content h2 {
+  font-size: 1.25em;
+}
+
+.markdown-content h3 {
+  font-size: 1.1em;
+}
+
+/* 목록 스타일 */
+.markdown-content ul,
+.markdown-content ol {
+  padding-left: 24px;
+  margin: 10px 0;
+}
+
+.markdown-content ul li,
+.markdown-content ol li {
+  margin-bottom: 6px;
+}
+
+.markdown-content ul {
+  list-style-type: disc;
+}
+
+.markdown-content ol {
+  list-style-type: decimal;
+}
+
+/* 인용구 스타일 */
+.markdown-content blockquote {
+  border-left: 3px solid var(--accent-color);
+  padding: 8px 12px;
+  margin: 12px 0;
+  color: var(--text-muted);
+  background-color: rgba(122, 162, 247, 0.1);
+  border-radius: 0 6px 6px 0;
+}
+
+.markdown-content blockquote p {
+  margin: 0;
+}
+
+/* 링크 스타일 */
+.markdown-content a {
+  color: var(--accent-color);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--accent-color);
+  transition: all 0.2s ease;
+}
+
+.markdown-content a:hover {
+  opacity: 0.8;
+  border-bottom-style: solid;
+}
+
+/* 이미지 스타일 */
+.markdown-content img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 10px 0;
+  display: block;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* 수평선 스타일 */
+.markdown-content hr {
+  border: none;
+  height: 1px;
+  background-color: var(--border-color);
+  margin: 20px 0;
+}
+
+/* 강조 스타일 */
+.markdown-content strong {
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+.markdown-content em {
+  font-style: italic;
+}
+
+.markdown-content del {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+/* 테이블 스타일 */
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  overflow-x: auto;
+  display: block;
+}
+
+.markdown-content table th,
+.markdown-content table td {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+}
+
+.markdown-content table th {
+  background-color: rgba(122, 162, 247, 0.1);
+  font-weight: 600;
+}
+
+.markdown-content table tr:nth-child(even) {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* 줄 간격 및 단락 스타일 */
+.markdown-content p {
+  margin: 10px 0;
+  line-height: 1.6;
+}
+
+/* Pulse animation for indicators */
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
 /* Mobile optimizations */
 @media (max-width: 768px) {
-  .chat-container {
-    width: 95%;
-    border-radius: 14px;
-    background-color: rgba(22, 24, 35, 0.95);
-  }
-
-  .chat-container.collapsed {
-    height: 120px;
-  }
-
-  .chat-container.expanded {
-    height: 320px;
-  }
-
   .chat-header {
-    border-radius: 14px 14px 0 0;
+    padding: 12px 16px;
   }
 
   .chat-message {
@@ -553,17 +608,63 @@
   }
 
   .send-button, .voice-button {
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
   }
 
   .chat-input {
-    padding: 8px 14px;
+    padding: 10px 16px;
     font-size: 13px;
   }
 
-  .chat-ui-container {
-    background: none !important;
-    box-shadow: none !important;
+  .chat-history {
+    padding: 16px;
+    margin-bottom: 70px; /* Smaller margin for mobile */
+  }
+
+  .chat-input-area {
+    padding: 12px 16px;
+  }
+
+  .scroll-indicator {
+    bottom: 80px;
+  }
+
+  /* 모바일에서 마크다운 스타일 조정 */
+  .markdown-content pre {
+    padding: 10px;
+    font-size: 12px;
+  }
+
+  .markdown-content h1 {
+    font-size: 1.3em;
+  }
+
+  .markdown-content h2 {
+    font-size: 1.15em;
+  }
+
+  .markdown-content h3 {
+    font-size: 1.05em;
+  }
+}
+
+/* Make sure chat container is always fully visible */
+@media (max-height: 500px) {
+  .chat-header {
+    padding: 8px 12px;
+  }
+
+  .chat-input-area {
+    padding: 8px 12px;
+  }
+
+  .send-button, .voice-button {
+    width: 34px;
+    height: 34px;
+  }
+
+  .chat-history {
+    margin-bottom: 60px; /* Even smaller margin for very small heights */
   }
 }

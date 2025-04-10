@@ -1,42 +1,8 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { useGLTF, OrbitControls, Environment, Stars, Sky, Grid, useTexture, Cloud } from '@react-three/drei';
+import { useGLTF, OrbitControls, Environment, Stars, Sky } from '@react-three/drei';
 import * as THREE from 'three';
 import '../styles/ModelViewer.css';
-import HouseModel from './HouseModel'; // 집 모델 컴포넌트 import
-import SecondCharacterModel from './SecondCharacterModel'; // 두 번째 캐릭터 모델 컴포넌트 import
-
-// 움직이는 구름 컴포넌트
-const Clouds = () => {
-  return (
-    <group>
-      <Cloud
-        opacity={0.7}
-        speed={0.4}
-        width={10}
-        depth={1.5}
-        segments={20}
-        position={[-10, 15, -15]}
-      />
-      <Cloud
-        opacity={0.5}
-        speed={0.3}
-        width={8}
-        depth={1}
-        segments={15}
-        position={[10, 12, -10]}
-      />
-      <Cloud
-        opacity={0.4}
-        speed={0.2}
-        width={6}
-        depth={0.8}
-        segments={10}
-        position={[0, 10, -5]}
-      />
-    </group>
-  )
-};
 
 // 밤하늘 별 컴포넌트
 const NightStars = () => {
@@ -111,30 +77,8 @@ const DynamicSky = ({ background }) => {
     <>
       <Sky {...skyProps} />
       {background === 'night' && <NightStars />}
-      {background !== 'night' && <Clouds />}
     </>
   );
-};
-
-// 그림자 디버깅 헬퍼 컴포넌트
-const ShadowHelper = () => {
-  const { scene } = useThree();
-
-  useEffect(() => {
-    // 씬의 모든 조명을 순회하며 그림자 카메라 헬퍼 추가
-    scene.traverse((object) => {
-      if (object.isDirectionalLight && object.castShadow) {
-        const helper = new THREE.CameraHelper(object.shadow.camera);
-        scene.add(helper);
-
-        return () => {
-          scene.remove(helper);
-        };
-      }
-    });
-  }, [scene]);
-
-  return null;
 };
 
 // 동적 조명 컴포넌트
@@ -219,8 +163,8 @@ const DynamicLighting = ({ background }) => {
         intensity={lights.directionalLight.intensity}
         color={lights.directionalLight.color}
         castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
         shadow-bias={-0.0001}
         shadow-normalBias={0.02}
       />
@@ -230,17 +174,9 @@ const DynamicLighting = ({ background }) => {
 
       {/* 포인트 라이트 - 얼굴 부분을 밝게 */}
       <pointLight
-        position={[0, 2, 3]}
+        position={[0, 1.8, 2]}
         intensity={lights.pointLight.intensity}
         color={lights.pointLight.color}
-      />
-
-      {/* 집 모델 뒤쪽에 추가 조명 */}
-      <pointLight
-        position={[0, 4, -10]}
-        intensity={lights.pointLight.intensity * 0.7}
-        color={lights.pointLight.color}
-        distance={15}
       />
     </>
   );
@@ -271,342 +207,358 @@ const EnvironmentEffects = ({ background }) => {
   );
 };
 
+// 단순화된 모델 컴포넌트 - 립싱크와 자연스러운 머리 움직임 포함
 const Model = ({ lipSyncData, modelPath, position, ...props }) => {
   const group = useRef();
+  const headRef = useRef();
   const { nodes, materials, animations } = useGLTF(modelPath || '/models/model1.glb');
   const [mixer] = useState(() => new THREE.AnimationMixer());
 
-  useEffect(() => {
-    if (group.current) {
-      //console.log("모델 뼈대 구조 출력:", modelPath);
+  // 모프 타겟 메시 참조
+  const morphTargetMeshes = useRef([]);
 
-      // 모든 본 이름 출력
-      const bones = [];
-      group.current.traverse((object) => {
-        if (object.isBone) {
-          bones.push({
-            name: object.name,
-            parent: object.parent ? object.parent.name : "none"
-          });
-          //console.log(`본 발견: ${object.name}`);
-        }
-      });
+  // 마지막으로 적용된 모프 타겟 값들
+  const lastMorphValues = useRef({});
 
-      if (bones.length > 0) {
-        //console.table(bones); // 표 형태로 정리해서 출력
-      }
+  // 이전 립싱크 데이터를 저장
+  const prevLipSyncDataRef = useRef(null);
+
+  // 머리 움직임을 위한 상태 및 참조
+  const [headFound, setHeadFound] = useState(false);
+  const initialHeadRotation = useRef(new THREE.Euler());
+  const targetRotation = useRef(new THREE.Euler());
+  const headMovementTimer = useRef(null);
+  const lastHeadMovementTime = useRef(0);
+
+  // 모델 스켈레톤 구조를 저장하기 위한 상태
+  const [debugInfo, setDebugInfo] = useState('');
+
+  // 랜덤 머리 움직임 타이머 설정 - 더 부드러운 움직임
+  const setupRandomHeadMovement = () => {
+    if (headMovementTimer.current) {
+      clearTimeout(headMovementTimer.current);
     }
-  }, [modelPath]);
 
-  // 입 모양 제어를 위한 참조
-  const morphTargetMesh = useRef();
+    // 다음 머리 움직임까지의 시간을 랜덤하게 설정 (3~8초) - 더 긴 시간 간격
+    const nextMovementDelay = 3000 + Math.random() * 5000;
 
-  // 애니메이션 시간 추적
-  const clock = useRef(new THREE.Clock());
+    headMovementTimer.current = setTimeout(() => {
+      if (headRef.current) {
+        // 머리 회전 각도를 랜덤하게 결정 (더 작고 부드러운 움직임)
+        const randomX = (Math.random() * 0.08 - 0.04) + (Math.random() > 0.7 ? -0.06 : 0); // 약간 아래 보는 경향
+        const randomY = Math.random() * 0.15 - 0.075; // 좌우 회전 축소
+        const randomZ = Math.random() * 0.04 - 0.02; // 약간의 기울임 축소
 
-  // 자연스러운 대기 애니메이션 상태
-  const [idleAnimation, setIdleAnimation] = useState(null);
+        // 목표 회전 값 설정
+        targetRotation.current.set(
+          initialHeadRotation.current.x + randomX,
+          initialHeadRotation.current.y + randomY,
+          initialHeadRotation.current.z + randomZ
+        );
+
+        lastHeadMovementTime.current = Date.now();
+      }
+
+      // 다음 움직임 설정
+      setupRandomHeadMovement();
+    }, nextMovementDelay);
+  };
 
   // 위치 직접 설정
   useEffect(() => {
     if (group.current && position) {
-      // 직접 position 설정
       group.current.position.set(position[0], position[1], position[2]);
     }
   }, [position]);
 
-  // 모델이 변경될 때마다 새로운 설정 적용
-  useEffect(() => {
-    if (group.current) {
-      // 모델 내에서 모프 타겟이 있는 메시 찾기
-      morphTargetMesh.current = null; // 이전 참조 초기화
+  // 모델 구조를 분석하는 함수
+  const analyzeModelStructure = (object, depth = 0) => {
+    let result = '';
+    const indent = ' '.repeat(depth * 2);
 
-      group.current.traverse((object) => {
-        if (object.morphTargetDictionary) {
-          morphTargetMesh.current = object;
-          //console.log('모프 타겟을 가진 메시 찾음:', object.name);
-          //console.log('사용 가능한 모프 타겟:', object.morphTargetDictionary);
+    if (!object) return result;
 
-          // 디버깅: 모든 모프 타겟 목록 출력
-          if (object.morphTargetDictionary) {
-            console.log('모든 모프 타겟 목록:');
-            for (const [key, value] of Object.entries(object.morphTargetDictionary)) {
-              //console.log(`  ${key}: 인덱스 ${value}`);
-            }
-            //console.log('모프 타겟 영향값 배열 길이:', object.morphTargetInfluences ? object.morphTargetInfluences.length : '없음');
-          }
-        }
+    const type = object.type || 'Unknown';
+    const name = object.name || 'Unnamed';
 
-        // 모든 메시에 그림자 설정
-        if (object.isMesh) {
-          object.castShadow = true;
-          object.receiveShadow = true;
-        }
+    result += `${indent}${name} (${type})`;
+
+    if (object.isBone) {
+      result += ' [Bone]';
+    }
+    if (object.isMesh) {
+      result += ' [Mesh]';
+      if (object.morphTargetDictionary) {
+        result += ` [MorphTargets: ${Object.keys(object.morphTargetDictionary).join(', ')}]`;
+      }
+    }
+
+    result += '\n';
+
+    if (object.children && object.children.length > 0) {
+      object.children.forEach(child => {
+        result += analyzeModelStructure(child, depth + 1);
       });
     }
 
-    // 애니메이션 정리
+    return result;
+  };
+
+  // 디버그 정보를 상위 컴포넌트에 전달하기 위한 props 함수
+  const { onDebugInfoChange } = props;
+
+  // 모델이 변경될 때마다 새로운 설정 적용
+  useEffect(() => {
+    if (group.current) {
+      // 모든 모프 타겟 메시 찾기 및 초기화
+      morphTargetMeshes.current = [];
+      lastMorphValues.current = {};
+      setHeadFound(false);
+      headRef.current = null;
+
+      // 모델 구조 분석
+      const structureInfo = analyzeModelStructure(group.current);
+      console.log("Model Structure:\n", structureInfo);
+
+      // 디버그 정보를 상위 컴포넌트로 전달
+      if (props.onDebugInfoChange) {
+        props.onDebugInfoChange(structureInfo);
+      }
+
+      // 뼈 및 메시 구조를 저장할 배열
+      const bones = [];
+      const meshes = [];
+
+      group.current.traverse((object) => {
+        // 모프 타겟이 있는 메시 찾기
+        if (object.morphTargetDictionary && object.morphTargetInfluences) {
+          morphTargetMeshes.current.push(object);
+          meshes.push(object);
+
+          // 모든 모프 타겟 이름과 인덱스 매핑 및 초기화
+          Object.keys(object.morphTargetDictionary).forEach(key => {
+            lastMorphValues.current[key] = 0;
+          });
+        }
+
+        // 모든 본 저장
+        if (object.isBone) {
+          bones.push(object);
+          console.log(`Found bone: ${object.name}`);
+        }
+
+        // 모든 메시 저장
+        if (object.isMesh) {
+          meshes.push(object);
+        }
+
+        // 메시에 그림자 설정
+        if (object.isMesh) {
+          object.castShadow = true;
+          object.receiveShadow = true;
+
+          // 메시 머티리얼 개선
+          if (object.material) {
+            if (object.material.roughness === undefined) {
+              object.material.roughness = 0.8;
+              object.material.metalness = 0.2;
+            }
+          }
+        }
+      });
+
+      // 머리 본 찾기 - 이름 패턴 확장
+      const headKeywords = ['head', 'skull', 'face', 'neck', 'cervical'];
+      let foundHead = false;
+
+      // 먼저 정확한 "Head" 본을 찾기
+      for (const bone of bones) {
+        const nameLower = bone.name.toLowerCase();
+        if (nameLower === 'head') {
+          console.log('Found exact Head bone:', bone.name);
+          headRef.current = bone;
+          foundHead = true;
+          break;
+        }
+      }
+
+      // 정확한 "Head"를 못 찾았다면 키워드 포함 본 찾기
+      if (!foundHead) {
+        for (const bone of bones) {
+          const nameLower = bone.name.toLowerCase();
+          for (const keyword of headKeywords) {
+            if (nameLower.includes(keyword)) {
+              console.log(`Found head-related bone: ${bone.name} (matched: ${keyword})`);
+              headRef.current = bone;
+              foundHead = true;
+              break;
+            }
+          }
+          if (foundHead) break;
+        }
+      }
+
+      // 본에서 못 찾았다면 메시에서 찾기
+      if (!foundHead) {
+        for (const mesh of meshes) {
+          const nameLower = mesh.name.toLowerCase();
+          for (const keyword of headKeywords) {
+            if (nameLower.includes(keyword)) {
+              console.log(`Found head-related mesh: ${mesh.name} (matched: ${keyword})`);
+              headRef.current = mesh;
+              foundHead = true;
+              break;
+            }
+          }
+          if (foundHead) break;
+        }
+      }
+
+      // 머리를 찾은 경우 초기 회전 저장
+      if (headRef.current) {
+        console.log(`Using ${headRef.current.name} for head movements`);
+        if (headRef.current.rotation) {
+          initialHeadRotation.current.copy(headRef.current.rotation);
+          targetRotation.current.copy(headRef.current.rotation);
+          setHeadFound(true);
+        }
+      }
+
+      // 머리를 찾지 못했을 경우 루트 그룹 또는 다른 대안 사용
+      if (!headFound) {
+        console.log('Head not found, trying to find alternative');
+
+        // 대안 1: 첫 번째 본 사용
+        if (bones.length > 0) {
+          console.log('Using first bone as head alternative:', bones[0].name);
+          headRef.current = bones[0];
+        }
+        // 대안 2: 루트 그룹 사용
+        else {
+          console.log('No bones found, using root group for animation');
+          headRef.current = group.current;
+        }
+
+        if (headRef.current && headRef.current.rotation) {
+          initialHeadRotation.current.copy(headRef.current.rotation);
+          targetRotation.current.copy(headRef.current.rotation);
+          setHeadFound(true);
+        }
+      }
+    }
+
+    // 애니메이션 정리 및 새 설정
     if (mixer) {
       mixer.stopAllAction();
+
+      if (animations && animations.length) {
+        const action = mixer.clipAction(animations[0], group.current);
+        action.play();
+
+        action.loop = THREE.LoopRepeat;
+        action.clampWhenFinished = false;
+        action.timeScale = 0.8;
+        action.setEffectiveWeight(1);
+      }
     }
 
-    // 새 애니메이션 설정
-    if (animations && animations.length) {
-      // 기본 애니메이션 (첫 번째) 사용
-      const action = mixer.clipAction(animations[0], group.current);
-      action.play();
-      setIdleAnimation(action);
+    // 이전 립싱크 데이터 초기화
+    prevLipSyncDataRef.current = null;
 
-      // 애니메이션 설정 - 루프 및 페이드 시간 조정
-      action.loop = THREE.LoopRepeat;
-      action.clampWhenFinished = false;
-      action.timeScale = 0.8; // 약간 느리게 재생
-      action.setEffectiveWeight(1);
-    }
+    // 머리 움직임 타이머 시작
+    setupRandomHeadMovement();
 
-    // 클럭 리셋
-    if (clock.current) {
-      clock.current = new THREE.Clock();
-    }
+    // 정리 함수
+    return () => {
+      if (headMovementTimer.current) {
+        clearTimeout(headMovementTimer.current);
+      }
+    };
+
   }, [animations, mixer, modelPath]);
 
-  // 립싱크 데이터에 따라 입 모양 업데이트
-  useEffect(() => {
-    if (morphTargetMesh.current && lipSyncData) {
-      const mesh = morphTargetMesh.current;
-
-      // mouthOpen 모프 타겟 제어 (입 벌림)
-      if (mesh.morphTargetDictionary && mesh.morphTargetDictionary.mouthOpen !== undefined) {
-        const mouthOpenIndex = mesh.morphTargetDictionary.mouthOpen;
-        mesh.morphTargetInfluences[mouthOpenIndex] = lipSyncData.intensity;
-      }
-
-      // mouthSmile 모프 타겟 제어 (미소)
-      if (mesh.morphTargetDictionary && mesh.morphTargetDictionary.mouthSmile !== undefined) {
-        const mouthSmileIndex = mesh.morphTargetDictionary.mouthSmile;
-        // 말할 때 약간의 미소를 추가 (강도의 절반 정도)
-        mesh.morphTargetInfluences[mouthSmileIndex] = lipSyncData.intensity * 0.5;
-      }
+  // 모프 타겟 애니메이션 최적화 함수 - 부드러운 전환 포함
+  const animateMorphTarget = (mesh, targetName, targetValue, duration = 0.2) => {
+    if (!mesh.morphTargetDictionary || mesh.morphTargetDictionary[targetName] === undefined) {
+      return;
     }
+
+    const index = mesh.morphTargetDictionary[targetName];
+    const currentValue = mesh.morphTargetInfluences[index];
+    const lastValue = lastMorphValues.current[targetName] || currentValue;
+
+    // 부드러운 전환을 위해 보간
+    const newValue = lastValue + (targetValue - lastValue) * (1 - Math.pow(0.1, duration));
+
+    // 값 업데이트 및 저장
+    mesh.morphTargetInfluences[index] = newValue;
+    lastMorphValues.current[targetName] = newValue;
+  };
+
+  // 립싱크 데이터에 따라 모프 타겟 업데이트
+  useEffect(() => {
+    // 립싱크 데이터가 없거나 이전과 동일하면 처리하지 않음
+    if (!lipSyncData || !lipSyncData.morphTargets ||
+        JSON.stringify(lipSyncData) === JSON.stringify(prevLipSyncDataRef.current)) {
+      return;
+    }
+
+    // 현재 데이터 저장
+    prevLipSyncDataRef.current = lipSyncData;
+
+    // 모든 모프 타겟 메시에 적용
+    morphTargetMeshes.current.forEach(mesh => {
+      // 모든 모핑 타겟 업데이트
+      Object.entries(lipSyncData.morphTargets).forEach(([targetName, targetValue]) => {
+        if (mesh.morphTargetDictionary && mesh.morphTargetDictionary[targetName] !== undefined) {
+          animateMorphTarget(mesh, targetName, targetValue);
+        }
+      });
+    });
   }, [lipSyncData]);
 
-  // 자연스러운 대기 움직임 및 애니메이션 업데이트
+  // 애니메이션 업데이트 및 머리 움직임 보간 - 부드러운 버전
   useFrame((state, delta) => {
     // 애니메이션 믹서 업데이트
     mixer.update(delta);
 
-    // 현재 시간 가져오기
-    const time = clock.current.getElapsedTime();
+    // 머리 움직임 애니메이션
+    if (headRef.current && headFound) {
+      // 더 낮은 lerpFactor 값으로 부드러운 움직임 구현
+      const lerpFactor = Math.min(1, delta * 0.8);
 
-    // 모델에 자연스러운 미세 움직임 추가
-    if (group.current && position) {
-      // 훨씬 약한 강도의 신체 부위별 움직임 애니메이션
-      group.current.traverse((object) => {
-        // 본 요소에만 애니메이션 적용
-        if (object.isBone) {
-          const boneName = object.name.toLowerCase();
+      // 현재 회전과 목표 회전 사이를 매우 부드럽게 보간
+      headRef.current.rotation.x += (targetRotation.current.x - headRef.current.rotation.x) * lerpFactor;
+      headRef.current.rotation.y += (targetRotation.current.y - headRef.current.rotation.y) * lerpFactor;
+      headRef.current.rotation.z += (targetRotation.current.z - headRef.current.rotation.z) * lerpFactor;
 
-          // 머리와 목 움직임
-          if (boneName.includes('head')) {
-            // 머리 자연스럽게 움직이기 - 주파수 낮추기(덜 빠르게)
-            object.rotation.z += Math.sin(time * 6) * 0.0002;
-            object.rotation.x += Math.sin(time * 6) * 0.0002;
-            object.rotation.y += Math.sin(time * 6) * 0.0001;
-          }
-          else if (boneName.includes('neck')) {
-            // 목은 머리보다 약간 적게 움직임
-            object.rotation.z += Math.sin(time * 5) * 0.0002;
-            object.rotation.x += Math.sin(time * 4) * 0.0002;
-          }
-
-          // 어깨 움직임
-          else if (boneName.includes('shoulder')) {
-            // 호흡과 함께 미세하게 올라갔다 내려갔다 하는 효과
-            const isLeft = boneName.includes('left');
-            const direction = isLeft ? 1 : -1;
-            object.rotation.z += Math.sin(time * 3) * 0.0006 * direction;
-          }
-
-          // 상체 움직임 (척추)
-          else if (boneName.includes('spine')) {
-            // 호흡에 따라 움직임
-            const spineIndex = boneName.match(/\d+$/);
-            if (spineIndex) {
-              const level = parseInt(spineIndex[0]);
-              // 상부 척추는 호흡에 더 영향 받음
-              if (level === 2) {
-                object.rotation.x += Math.sin(time * 4) * 0.0002;
-              } else {
-                // 하부 척추는 덜 움직임
-                object.rotation.x += Math.sin(time * 4) * 0.0002;
-              }
-            }
-          }
-
-          // 팔 움직임 - 덜 과격하게
-          else if (boneName.includes('arm') && !boneName.includes('fore')) {
-            const isLeft = boneName.includes('left');
-            const direction = isLeft ? 1 : -1;
-
-            // 팔을 미세하게 움직이기 (주파수와 강도 줄임)
-            object.rotation.z += Math.sin(time * 6) * 0.0003 * direction;
-          }
-          else if (boneName.includes('forearm')) {
-            // 팔꿈치 미세하게 움직이기 (주파수와 강도 줄임)
-            object.rotation.x += Math.sin(time * 4) * 0.0003;
-          }
-
-          // 손과 손가락 움직임 - 덜 과격하게
-          else if (boneName.includes('hand') || boneName.includes('finger') || boneName.includes('thumb')) {
-            const fingerType = boneName.includes('thumb') ? 'thumb' :
-                            boneName.includes('index') ? 'index' :
-                            boneName.includes('middle') ? 'middle' :
-                            boneName.includes('ring') ? 'ring' : 'pinky';
-
-            // 손가락마다 다른 속도로 미세하게 움직임 (주파수 낮춤)
-            const fingerSpeeds = {
-              'thumb': 0.3,
-              'index': 0.25,
-              'middle': 0.2,
-              'ring': 0.23,
-              'pinky': 0.27
-            };
-
-            const fingerIndex = parseInt((boneName.match(/\d+$/) || ["0"])[0]);
-            const speed = fingerSpeeds[fingerType] || 0.2;
-
-            // 각 손가락 관절마다 약간 다른 움직임
-            if (fingerIndex === 1) {
-              // 첫번째 관절은 조금 더 움직임
-              object.rotation.z += Math.sin(time * speed) * 0.0003;
-            } else {
-              // 다른 관절은 덜 움직임
-              object.rotation.z += Math.sin(time * speed) * 0.0002;
-            }
-          }
-
-          // 다리는 최소한의 움직임만
-          else if (boneName.includes('upleg')) {
-            // 무게 중심 이동 효과
-            const isLeft = boneName.includes('left');
-            const direction = isLeft ? 1 : -1;
-            const weightShiftSpeed = 0.05; // 매우 느린 체중 이동
-
-
-          }
-        }
-      });
-      // 호흡 효과
-      const breathingIntensity = 0.003; // 적당한 호흡 강도
-      const breathingSpeed = 1.5;
-      const breathEffect = Math.sin(time * breathingSpeed) * breathingIntensity;
-
-      // 위치 변경 - Y축에 호흡 효과 적용
-      group.current.position.y = position[1] + breathEffect;
-    }
-
-    // 눈 깜빡임 처리
-    if (morphTargetMesh.current) {
-      const mesh = morphTargetMesh.current;
-
-      // 모프 타겟 사전 확인
-      if (mesh.morphTargetDictionary) {
-        // 립싱크 중에는 눈 깜빡임 억제 또는 조정
-        const isSpeaking = lipSyncData && lipSyncData.intensity > 0.1;
-
-        // 말하는 중이면 눈 깜빡임 간격을 길게 조정 (덜 자주 깜빡이게)
-        const baseBlinkInterval = isSpeaking ? 7 : 5; // 말할 때는 더 길게
-        // 랜덤성 추가 (말할 때는 변동폭 작게)
-        const randomFactor = isSpeaking ? 1 : 2;
-
-        // 최종 깜빡임 간격 계산
-        const blinkInterval = baseBlinkInterval + Math.sin(time * 0.1) * randomFactor;
-
-        // 깜빡임 시간 계산 (립싱크 상태가 변경될 때 깜빡임 타이밍 리셋 방지)
-        // 시간을 더 큰 단위로 나누어 타이밍 안정화
-        const stableTime = Math.floor(time / 10) * 10 + (time % 10);
-        const blinkTime = stableTime % blinkInterval;
-        const blinkDuration = 0.15;
-
-        // 왼쪽 눈 깜빡임 처리
-        if (mesh.morphTargetDictionary.eyeBlinkLeft !== undefined) {
-          const eyeBlinkLeftIndex = mesh.morphTargetDictionary.eyeBlinkLeft;
-
-          if (blinkTime < blinkDuration) {
-            // 자연스러운 눈 깜빡임 (위아래로 빠르게)
-            const blinkValue = Math.sin(blinkTime / blinkDuration * Math.PI);
-            mesh.morphTargetInfluences[eyeBlinkLeftIndex] = blinkValue;
-          } else {
-            // 눈 뜨기
-            mesh.morphTargetInfluences[eyeBlinkLeftIndex] = 0;
-          }
-        }
-
-        // 오른쪽 눈 깜빡임 처리 (왼쪽과 동일한 타이밍)
-        if (mesh.morphTargetDictionary.eyeBlinkRight !== undefined) {
-          const eyeBlinkRightIndex = mesh.morphTargetDictionary.eyeBlinkRight;
-
-          if (blinkTime < blinkDuration) {
-            const blinkValue = Math.sin(blinkTime / blinkDuration * Math.PI);
-            mesh.morphTargetInfluences[eyeBlinkRightIndex] = blinkValue;
-          } else {
-            mesh.morphTargetInfluences[eyeBlinkRightIndex] = 0;
-          }
-        }
-
-        // 가끔 미소짓기 (립싱크 중이 아닐 때만)
-        if (mesh.morphTargetDictionary.mouthSmile !== undefined &&
-            (!lipSyncData || lipSyncData.intensity < 0.1)) {
-
-          const mouthSmileIndex = mesh.morphTargetDictionary.mouthSmile;
-
-          // 가끔 미소 짓기 (약 25-35초마다)
-          const smileInterval = 30 + Math.sin(time * 0.05) * 5;
-          const smileTime = time % smileInterval;
-          const smileDuration = 3;
-
-          if (smileTime < smileDuration) {
-            // 부드럽게 시작하고 끝나는 미소
-            let smileValue = 0;
-
-            if (smileTime < 1) {
-              // 미소 시작
-              smileValue = smileTime * 0.2;
-            } else if (smileTime > smileDuration - 1) {
-              // 미소 끝내기
-              smileValue = 0.2 * (1 - (smileTime - (smileDuration - 1)));
-            } else {
-              // 미소 유지
-              smileValue = 0.2;
-            }
-
-            mesh.morphTargetInfluences[mouthSmileIndex] = smileValue;
-          } else {
-            // 기본 표정 (말하는 중이 아니면)
-            if (!lipSyncData || lipSyncData.intensity < 0.1) {
-              mesh.morphTargetInfluences[mouthSmileIndex] = 0;
-            }
-          }
-        }
+      // 대화 중에는 미세한 움직임만 추가 (립싱크 시 과도한 움직임 감소)
+      if (lipSyncData && lipSyncData.morphTargets && lipSyncData.morphTargets.mouthOpen > 0.1) {
+        // 매우 미세한 움직임만 추가
+        const talkingMovement = Math.sin(state.clock.getElapsedTime() * 8) * 0.001;
+        headRef.current.rotation.x += talkingMovement;
+        headRef.current.rotation.y += talkingMovement * 0.2;
+      } else {
+        // 대화 중이 아닐 때도 더 부드럽고 자연스러운 미세한 움직임 추가
+        const idleMovement = Math.sin(state.clock.getElapsedTime() * 0.3) * 0.002;
+        headRef.current.rotation.x += idleMovement;
+        headRef.current.rotation.y += idleMovement * 0.2;
       }
     }
   });
 
   return (
     <group ref={group} {...props}>
-      {/* position은 이제 useEffect와 useFrame에서 직접 처리하므로 여기서는 전달하지 않음 */}
       <primitive object={nodes.Scene || nodes.scene || Object.values(nodes)[0]} />
     </group>
   );
 };
 
-// 모델 뷰어 메인 컴포넌트
+// 모델 뷰어 메인 컴포넌트 - 상반신 확대 버전
 const ModelViewer = ({
   lipSyncData,
   background = 'default',
   modelPath = '/models/model1.glb',
-  secondModelPath = '/models/model5.glb', // 두 번째 모델 경로 추가
-  secondModelPosition = [1.5, -0.87, 0], // 두 번째 모델 위치 추가
   isSpeaking = false
 }) => {
   // 모바일 장치 감지
@@ -615,15 +567,16 @@ const ModelViewer = ({
   // 모델 경로 추적
   const [currentModelPath, setCurrentModelPath] = useState(modelPath);
 
+  // 디버그 정보 상태 및 토글
+  const [showDebug, setShowDebug] = useState(false);
+  const [debugInfo, setDebugInfo] = useState('');
+
   // 모델 경로가 변경되면 업데이트
   useEffect(() => {
     setCurrentModelPath(modelPath);
-    //console.log("모델 경로 업데이트:", modelPath);
-
     // 모델 프리로드
     useGLTF.preload(modelPath);
-    useGLTF.preload(secondModelPath); // 두 번째 모델도 프리로드
-  }, [modelPath, secondModelPath]);
+  }, [modelPath]);
 
   // 배경에 따른 씬 분위기 설정
   const sceneColor = useMemo(() => {
@@ -631,26 +584,22 @@ const ModelViewer = ({
       case 'sunset':
         return {
           fog: new THREE.FogExp2('#ff7e57', 0.007),
-          groundColor: '#e9b69a',
-          gridColor: '#b77c66'
+          groundColor: '#e9b69a'
         };
       case 'night':
         return {
           fog: new THREE.FogExp2('#1a1a2e', 0.008),
-          groundColor: '#2c2c3d',
-          gridColor: '#444464'
+          groundColor: '#2c2c3d'
         };
       case 'dawn':
         return {
           fog: new THREE.FogExp2('#ffcdb6', 0.005),
-          groundColor: '#f3d9c9',
-          gridColor: '#bc9483'
+          groundColor: '#f3d9c9'
         };
       default: // 'default'
         return {
           fog: null,
-          groundColor: '#e0e0e0',
-          gridColor: '#727272'
+          groundColor: '#e0e0e0'
         };
     }
   }, [background]);
@@ -659,26 +608,34 @@ const ModelViewer = ({
     const checkMobile = () => {
       const userAgent = navigator.userAgent || navigator.vendor || window.opera;
       const mobileRegex = /android|iphone|ipad|ipod|blackberry|kindle|silk|opera mini/i;
-      setIsMobile(mobileRegex.test(userAgent));
+      setIsMobile(mobileRegex.test(userAgent) || window.innerWidth < 768);
     };
 
     checkMobile();
+    window.addEventListener('resize', checkMobile);
 
-    // 화면 크기 변경 시 모바일 여부 다시 확인
-    const handleResize = () => {
-      checkMobile();
+    // 개발 모드 토글을 위한 키보드 이벤트 리스너
+    const handleKeyPress = (e) => {
+      if (e.key === 'd' && e.ctrlKey) {
+        setShowDebug(prev => !prev);
+      }
     };
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('keydown', handleKeyPress);
+
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+      window.removeEventListener('keydown', handleKeyPress);
+    };
   }, []);
 
   return (
     <div className={`model-viewer background-${background}`}>
       <Canvas
         camera={{
-          position: [0, 1.5, isMobile ? 3 : 4],
-          fov: 50,
+          // 카메라 위치 변경 - 더 가깝게, 약간 높게 설정하여 상반신에 초점
+          position: [0, 0.2, isMobile ? 1.2 : 1.5],
+          fov: 15, // 시야각 축소로 줌인 효과 (기존 50 → 30)
           near: 0.1,
           far: 1000
         }}
@@ -687,7 +644,7 @@ const ModelViewer = ({
           enabled: true
         }}
         style={{ background: 'transparent' }}
-        dpr={[1, 2]}
+        dpr={[1, 1.5]} // 성능 최적화
         performance={{ min: 0.5 }}
         gl={{
           antialias: true,
@@ -698,81 +655,41 @@ const ModelViewer = ({
         {/* 동적 조명 */}
         <DynamicLighting background={background} />
 
-        {/* 바닥 */}
-        <mesh
-          rotation={[-Math.PI / 2, 0, 0]}
-          position={[0, -1, 0]}
-          receiveShadow
-        >
-          <planeGeometry args={[100, 100]} />
-          <meshPhysicalMaterial
-            color={sceneColor.groundColor}
-            roughness={0.8}
-            metalness={0.1}
-            reflectivity={0.1}
-          />
-        </mesh>
-
-        {/* 메인 모델 - 현재 선택된 모델 경로 사용 */}
+        {/* 메인 모델 - 위치 조정으로 상반신 중심 배치 */}
         <Model
           lipSyncData={lipSyncData}
           modelPath={currentModelPath}
-          position={[0, -0.87, 0]}
-          scale={isMobile ? 0.9 : 1}
+          position={[0, -1.7, 0]} // 위치 상향 조정 (y축 상승)
+          scale={isMobile ? 0.9 : 1.0} // 스케일 약간 증가
           rotation={[0, 0, 0]}
           castShadow
+          onDebugInfoChange={setDebugInfo}
         />
 
-        {/* 두 번째 캐릭터 모델 추가 */}
-        <SecondCharacterModel
-          modelPath={secondModelPath}
-          position={secondModelPosition}
-          scale={isMobile ? 0.9 : 1}
-          rotation={[0, Math.PI / -2, 0]} // 약간 메인 캐릭터 쪽으로 회전
-          castShadow
-        />
-
-        {/* 집 모델 - 사람 모델 뒤에 배치 */}
-        <HouseModel
-          position={[1.5, -1.4, -1]}
-          scale={isMobile ? 2 : 3}
-          rotation={[0, Math.PI / 12, 0]}
-        />
-
-        {/* 카메라 컨트롤 */}
+        {/* 카메라 컨트롤 - 제한된 범위 */}
         <OrbitControls
-          enableZoom={true}
+          enableZoom={false}
           enablePan={false}
-          minPolarAngle={Math.PI / 6}
-          maxPolarAngle={Math.PI / 1.5}
-          minDistance={2}
-          maxDistance={20} // 더 멀리 볼 수 있도록 조정
+          minPolarAngle={Math.PI / 3}
+          maxPolarAngle={Math.PI / 2.2} // 더 제한된 상하 움직임
+          rotateSpeed={0.4} // 회전 속도 감소
           enableDamping={true}
           dampingFactor={0.1}
         />
 
-        {/* 배경 하늘과 환경 효과 */}
+        {/* 배경 하늘 */}
         <DynamicSky background={background} />
-
-        {/* 그리드 바닥 - 더 세련된 디자인 */}
-        <Grid
-          position={[0, -1.01, 0]}
-          args={[100, 100]} // 더 넓은 그리드
-          cellSize={0.8}
-          cellThickness={0.6}
-          cellColor="#353535"
-          sectionSize={4}
-          sectionThickness={1.2}
-          sectionColor={sceneColor.gridColor}
-          fadeDistance={50} // 더 멀리 표시
-          fadeStrength={1.5}
-          followCamera={false}
-          infiniteGrid={true}
-        />
 
         {/* 환경 */}
         <EnvironmentEffects background={background} />
       </Canvas>
+
+      {showDebug && (
+        <div className="debug-panel">
+          <h3>Debug Info</h3>
+          <pre>{debugInfo}</pre>
+        </div>
+      )}
     </div>
   );
 };
@@ -781,5 +698,3 @@ export default ModelViewer;
 
 // 기본 모델 프리로딩
 useGLTF.preload('/models/model1.glb');
-// 두 번째 모델도 프리로딩
-useGLTF.preload('/models/model5.glb');

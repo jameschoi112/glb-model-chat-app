@@ -1,52 +1,48 @@
-.time-digits {
-  display: flex;
-  align-items: baseline;
-  font-size: 28px;
-}/* Enhanced DateTimeDisplay.css */
+/* 검은색/녹색 테마에 맞게 업데이트된 DateTimeDisplay.css */
 .datetime-display {
   position: absolute;
   top: 20px;
-  right: 20px;
-  background: rgba(25, 25, 50, 0.85);
+  left: 20px;
+  background: rgba(18, 18, 18, 0.85);
   color: white;
-  border-radius: 16px;
+  border-radius: 12px;
   backdrop-filter: blur(15px);
   font-family: 'Poppins', 'Segoe UI', sans-serif;
   z-index: 100;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(29, 185, 84, 0.25);
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
-  min-width: 200px;
+  min-width: 180px;
   padding: 12px 16px;
 }
 
 .datetime-display:hover {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
   transform: translateY(-3px);
-  border-color: rgba(100, 140, 255, 0.4); /* 남색에 맞는 테두리 색상 */
+  border-color: rgba(29, 185, 84, 0.4);
 }
 
 .datetime-container {
   display: flex;
   width: 100%;
   align-items: center;
-  flex-direction: row-reverse; /* 아이콘을 오른쪽으로 */
+  flex-direction: row-reverse;
 }
 
 .datetime-icon-section {
   padding: 10px;
-  background: rgba(100, 140, 255, 0.2);
-  border-radius: 12px;
-  margin-left: 12px; /* 오른쪽에 있을 때 여백 */
-  margin-right: 0; /* 기존 오른쪽 여백 제거 */
+  background: rgba(29, 185, 84, 0.12);
+  border-radius: 10px;
+  margin-left: 12px;
+  margin-right: 0;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .datetime-icon {
-  color: #648cff; /* 남색으로 변경 */
+  color: #1db954;
   opacity: 0.9;
 }
 
@@ -69,13 +65,13 @@
 }
 
 .date-icon {
-  color: #648cff; /* 남색으로 변경 */
+  color: #1db954;
   opacity: 0.8;
 }
 
 .date-text {
   font-weight: 500;
-  text-align: right; /* 우측 정렬 추가 */
+  text-align: right;
 }
 
 .day-name {
@@ -84,8 +80,8 @@
   opacity: 0.8;
   font-weight: 300;
   letter-spacing: 0.5px;
-  color: rgba(255, 255, 255, 0.7);
-  text-align: right; /* 우측 정렬 추가 */
+  color: rgba(29, 185, 84, 0.8);
+  text-align: right;
 }
 
 .time {
@@ -115,25 +111,28 @@
   font-size: 18px;
   opacity: 0.8;
   font-weight: 400;
+  color: rgba(29, 185, 84, 0.9);
 }
 
 .separator {
   margin: 0 2px;
   opacity: 0.7;
+  color: rgba(29, 185, 84, 0.9);
 }
 
 .sec-separator {
   margin: 0 2px;
   opacity: 0.5;
   font-size: 20px;
+  color: rgba(29, 185, 84, 0.7);
 }
 
 .ampm {
   font-size: 14px;
-  background: rgba(100, 140, 255, 0.3); /* 남색 계열로 변경 */
+  background: rgba(29, 185, 84, 0.2);
   padding: 4px 6px;
   border-radius: 6px;
-  color: white;
+  color: #1db954;
   font-weight: 600;
   letter-spacing: 0.5px;
   margin-left: 8px;
@@ -146,47 +145,27 @@
   100% { opacity: 1; }
 }
 
-/* 시간에 반짝임 효과 */
-.time::after {
-  content: '';
-  position: absolute;
-  top: -20%;
-  left: -10%;
-  width: 120%;
-  height: 140%;
-  background: radial-gradient(ellipse at center, rgba(100, 140, 255, 0.15) 0%, rgba(255, 255, 255, 0) 70%); /* 남색 계열로 변경 */
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.5s;
-}
-
-.datetime-display:hover .time::after {
-  opacity: 1;
+.separator.blink {
+  animation: pulsate 1s infinite;
 }
 
 /* 모바일 최적화 */
 @media (max-width: 768px) {
   .datetime-display {
     top: 15px;
-    right: 15px;
-    min-width: 180px;
+    left: 15px;
+    min-width: 160px;
     padding: 10px 14px;
-  }
-
-  .date {
-    font-size: 14px;
-  }
-
-  .day-name {
-    font-size: 12px;
+    transform: scale(0.9);
+    transform-origin: top left;
   }
 
   .time-digits {
-    font-size: 24px;
+    font-size: 22px;
   }
 
   .seconds {
-    font-size: 16px;
+    font-size: 14px;
   }
 
   .ampm {
