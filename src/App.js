@@ -5,11 +5,14 @@ import ChatInterface from './components/ChatInterface';
 // import DateTimeDisplay from './components/DateTimeDisplay';
 import AdminPanel from './components/AdminPanel';
 import WelcomePopup from './components/WelcomePopup';
+import VoiceSettings from './components/VoiceSettings';
+import UserProfile from './components/UserProfile';
+import ThemeSettings, { THEME_OPTIONS } from './components/ThemeSettings';
 import useLipSync from './components/LipSync';
 import { initializeSession, sendMessageStream, resetSession } from './services/customChatService';
 import { speakText } from './services/openaiVoiceService';
 import { startSpeechRecognition, stopSpeechRecognition } from './services/speechRecognitionService';
-import { X, Maximize2, Minimize2, Move, MessageSquare, Menu, ChevronLeft, Search } from 'lucide-react';
+import { X, Maximize2, Minimize2, Move, MessageSquare, Menu, ChevronLeft, Search, Settings } from 'lucide-react';
 import './App.css';
 
 
@@ -68,15 +71,31 @@ function App() {
   const [suggestedQuestions, setSuggestedQuestions] = useState([]);
   const [sessionInitialized, setSessionInitialized] = useState(false);
 
+  // 음성 설정 상태 추가
+  const [voiceSettings, setVoiceSettings] = useState(() => {
+    return {
+      voiceId: localStorage.getItem('avatarVoiceId') || 'onyx',
+      speechRate: parseFloat(localStorage.getItem('avatarSpeechRate') || '1.0')
+    };
+  });
+  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
+
+  // 테마 설정 상태 추가
+  const [showThemeSettings, setShowThemeSettings] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState(() => {
+    const savedTheme = localStorage.getItem('avatarTheme');
+    return savedTheme
+      ? THEME_OPTIONS.find(theme => theme.id === savedTheme) || THEME_OPTIONS[0]
+      : THEME_OPTIONS[0];
+  });
+
   // Model viewer related states
   const [modelViewerExpanded, setModelViewerExpanded] = useState(false);
   const [modelViewerVisible, setModelViewerVisible] = useState(true);
-
-  // Drag related states
-  const [modelViewerPosition, setModelViewerPosition] = useState({ x: 20, y: 70 });
+  const modelViewerRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const modelViewerRef = useRef(null);
+  const [modelViewerPosition, setModelViewerPosition] = useState({ x: 20, y: 70 });
 
   // Chat history sidebar states
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -100,6 +119,38 @@ function App() {
 
   const audioRef = useRef(null);
   const welcomeMessageRef = useRef('Hello! I\'m your AI assistant. How can I help you today?');
+
+  // 테마 설정 적용 함수
+  const handleApplyTheme = (theme) => {
+    setCurrentTheme(theme);
+
+    // CSS 변수 업데이트 (root 요소에 적용)
+    const root = document.documentElement;
+    Object.entries(theme.colors).forEach(([key, value]) => {
+      let cssVarName = '--' + key.replace(/([A-Z])/g, '-$1').toLowerCase();
+      root.style.setProperty(cssVarName, value);
+    });
+
+    console.log('테마가 변경되었습니다:', theme.name);
+  };
+
+  // 앱 초기 로드 시 테마 적용
+  useEffect(() => {
+    if (currentTheme) {
+      handleApplyTheme(currentTheme);
+    }
+  }, []);
+
+  // 음성 설정 적용 함수
+  const handleApplyVoiceSettings = (newSettings) => {
+    setVoiceSettings(newSettings);
+    console.log('음성 설정이 업데이트되었습니다:', newSettings);
+  };
+
+  // 음성 설정 토글 함수
+  const toggleVoiceSettings = () => {
+    setShowVoiceSettings(!showVoiceSettings);
+  };
 
   // Search animation
   const toggleSearch = () => {
@@ -144,7 +195,7 @@ function App() {
     }
   };
 
-  // Drag start handler
+  // 드래그 시작 핸들러
   const handleDragStart = (e) => {
     if (modelViewerExpanded) return; // No dragging in expanded mode
 
@@ -170,7 +221,7 @@ function App() {
     setIsDragging(true);
   };
 
-  // Drag handler
+  // 드래그 핸들러
   const handleDrag = (e) => {
     if (!isDragging) return;
 
@@ -211,12 +262,12 @@ function App() {
     setModelViewerPosition({ x: newX, y: newY });
   };
 
-  // Drag end handler
+  // 드래그 종료 핸들러
   const handleDragEnd = () => {
     setIsDragging(false);
   };
 
-  // Global event listeners setup
+  // 이벤트 리스너 설정을 위한 useEffect 추가
   useEffect(() => {
     if (isDragging) {
       window.addEventListener('mousemove', handleDrag);
@@ -483,7 +534,7 @@ function App() {
     ]);
   };
 
-  // Text-to-speech function
+  // Text-to-speech function - 음성 설정 적용
   const handleSpeech = async (text) => {
     try {
       // Stop previous audio if playing
@@ -508,10 +559,14 @@ function App() {
 
       console.log("Starting speech synthesis:", text);
 
-      // Create audio object for speech playback
-      const voice = 'onyx'; // Male voice
-      audioRef.current = await speakText(text, voice);
-      const audio = audioRef.current; // Store in local var for safe reference in event handlers
+      // 음성 설정 적용하여 음성 생성
+      const voice = voiceSettings.voiceId;
+      const speed = voiceSettings.speechRate;
+      console.log(`음성 생성 설정: 음성=${voice}, 속도=${speed}`);
+
+      // Create audio object for speech playback with specified settings
+      audioRef.current = await speakText(text, voice, speed);
+      const audio = audioRef.current;
 
       // Audio loading state events
       audio.addEventListener('canplay', () => {
@@ -801,6 +856,21 @@ function App() {
             />
           )}
 
+          {/* 음성 설정 팝업 */}
+          <VoiceSettings
+            isOpen={showVoiceSettings}
+            onClose={() => setShowVoiceSettings(false)}
+            onApply={handleApplyVoiceSettings}
+          />
+
+          {/* 테마 설정 팝업 */}
+          <ThemeSettings
+            isOpen={showThemeSettings}
+            onClose={() => setShowThemeSettings(false)}
+            onApply={handleApplyTheme}
+            currentTheme={currentTheme.id}
+          />
+
           <div className="main-content">
             {/* Model viewer (draggable container) */}
             {modelViewerVisible && (
@@ -809,7 +879,7 @@ function App() {
                 className={`model-viewer-container ${modelViewerExpanded ? 'expanded' : ''} ${isDragging ? 'dragging' : ''}`}
                 style={
                   modelViewerExpanded
-                    ? {} // Centered when expanded
+                    ? {} // 확장 시 중앙 배치
                     : { top: `${modelViewerPosition.y}px`, left: `${modelViewerPosition.x}px`, position: 'absolute' }
                 }
               >
@@ -819,10 +889,12 @@ function App() {
                   onTouchStart={!modelViewerExpanded ? handleDragStart : undefined}
                 >
                   <div className="model-viewer-drag-handle">
-
                     <span>My Avatar</span>
                   </div>
                   <div className="model-viewer-controls">
+                    <button className="model-control-btn" onClick={toggleVoiceSettings} title="음성 설정">
+                      <Settings size={16} />
+                    </button>
                     {modelViewerExpanded ? (
                       <button className="model-control-btn" onClick={toggleModelViewerExpanded}>
                         <Minimize2 size={16} />
@@ -960,6 +1032,9 @@ function App() {
                     <div className="no-results">No matching chats found</div>
                   )}
                 </div>
+                <UserProfile
+                  onSettingsClick={() => setShowThemeSettings(true)}
+                />
               </div>
             </div>
           </div>
